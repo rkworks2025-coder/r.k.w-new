@@ -492,7 +492,11 @@ function buildPayload(){
     std_r: gv('[name="std_r"]')
   };
 }
-form.addEventListener('submit', async () => {
+form.addEventListener('submit', async (ev) => {
+  try{ ev.preventDefault(); }catch(_){}
+  const p = buildPayload();
+  try{ if(!guardBeforeSubmit(p)) return; }catch(_){ /* no guard configured */ }
+
   const p = buildPayload();
   const lines=[
     `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}${(p.std_f&&p.std_r)?`    ${p.std_f}-${p.std_r}`:''}   RF`,

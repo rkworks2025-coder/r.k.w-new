@@ -1,5 +1,6 @@
 
 // ---- v3r: draft autosave (plate+station keyed), no UI changes ----
+// v3t: reload-aware restore + pagehide flush + lastKey in sessionStorage
 (function(){
   const NS = 'draft:v1';
   const DRAFT_TTL_MS = 24*60*60*1000;
@@ -59,13 +60,35 @@
       const key = getKey(); if(!key) return;
       const data = collectValues(); if(!data) return;
       localStorage.setItem(key, JSON.stringify(data));
+      lastKeyStore(key);
     }catch(_){}
   }
   function saveDraftDebounced(){
     clearTimeout(draftTimer);
     draftTimer = setTimeout(saveDraftNow, 600);
   }
-  function tryLoadDraft(){
+  function isReload(){
+      try{
+        const navs = performance.getEntriesByType && performance.getEntriesByType('navigation');
+        if(navs && navs.length && navs[0].type) return navs[0].type === 'reload';
+      }catch(_){}
+      try{
+        if (performance && performance.navigation) return performance.navigation.type === 1; // deprecated fallback
+      }catch(_){}
+      return false;
+    }
+
+    function lastKeyStore(setKey){
+      try{
+        const K='draft:lastKey';
+        if (setKey===undefined) return sessionStorage.getItem(K);
+        if (setKey===null) sessionStorage.removeItem(K);
+        else sessionStorage.setItem(K, setKey);
+      }catch(_){}
+      return null;
+    }
+
+    function tryLoadDraft(){
     try{
       const key = getKey(); if(!key) return;
       const raw = localStorage.getItem(key);
@@ -92,10 +115,35 @@
 
   // 起動時と plate/station 確定時に復元
   document.addEventListener('DOMContentLoaded', ()=>{
+    // On hard reload in same tab, restore last active draft safely
+    try{
+      if(isReload()){
+        const lk = lastKeyStore();
+        if(lk){
+          const raw = localStorage.getItem(lk);
+          if(raw){
+            const d = JSON.parse(raw);
+            // TTL check (if present in code)
+            try{
+              if(typeof DRAFT_TTL_MS !== 'undefined'){
+                if(!d.ts || (Date.now()-d.ts) > DRAFT_TTL_MS) throw new Error('ttl');
+              }
+            }catch(_){}
+            applyValues(d);
+          }
+        }
+      }
+    }catch(_){}
+
+
     observeTimes();
     const f = getForm(); if(!f) return;
     tryLoadDraft();
     f.addEventListener('input', saveDraftDebounced);
+    // Flush on pagehide/visibilitychange to catch quick reload/close
+    try{ window.addEventListener('pagehide', ()=>{ try{ saveDraftNow(); }catch(_){ } }); }catch(_){}
+    try{ document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ try{ saveDraftNow(); }catch(_){ } } }); }catch(_){}
+
     const plateEl = f.querySelector('[name="plate_full"]');
     const stationEl = f.querySelector('[name="station"]');
     plateEl && plateEl.addEventListener('blur', tryLoadDraft);

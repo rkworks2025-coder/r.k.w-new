@@ -1,4 +1,61 @@
 
+// ---- v3g: 前回値プレースホルダー（plate別） ----
+function loadLastByPlate(){
+  try{ return JSON.parse(localStorage.getItem('lastByPlate')||'{}'); }catch(_){ return {}; }
+}
+function saveLastByPlate(db){
+  try{ localStorage.setItem('lastByPlate', JSON.stringify(db)); }catch(_){}
+}
+function getLastForPlate(plateInput){
+  const key = normalizePlateKey(plateInput||'');
+  if(!key) return null;
+  const db = loadLastByPlate();
+  return db[key] || null; // { wheels: {RF:{depth,press,week},...}, ts, station, car }
+}
+function rememberLastByPlate(model){
+  const key = normalizePlateKey(model.plate);
+  if(!key) return;
+  const db = loadLastByPlate();
+  db[key] = { wheels: model.wheels, ts: model.ts, station: model.station, car: model.car };
+  saveLastByPlate(db);
+}
+
+function applyLastPlaceholdersForPlate(){
+  const plateEl = document.querySelector('#plate');
+  if(!plateEl) return;
+  const last = getLastForPlate(plateEl.value);
+  const DEF_WEEK_PH = '例: 4822';
+
+  ["RF","LF","LR","RR"].forEach(w=>{
+    const row = document.querySelector(`.wheel-row[data-wheel="${w}"]`);
+    if(!row) return;
+    const depthEl = row.querySelector('.input-depth');
+    const pressEl = row.querySelector('.input-press');
+    const weekEl  = row.querySelector('.input-week');
+
+    if(last && last.wheels && last.wheels[w]){
+      const r = last.wheels[w];
+      if(depthEl) depthEl.placeholder = (r.depth ?? '') || '';
+      if(pressEl) pressEl.placeholder = (r.press ?? '') || '';
+      if(weekEl)  weekEl.placeholder  = (r.week  ?? '') || DEF_WEEK_PH;
+    }else{
+      // 既定の例示に戻す（深溝・空気圧は無表示、年週は例文）
+      if(depthEl && !depthEl.value) depthEl.placeholder = '';
+      if(pressEl && !pressEl.value) pressEl.placeholder = '';
+      if(weekEl  && !weekEl.value)  weekEl.placeholder  = DEF_WEEK_PH;
+    }
+  });
+}
+
+function setupLastPlaceholders(){
+  const plateEl = document.querySelector('#plate');
+  if(!plateEl) return;
+  const handler = ()=> applyLastPlaceholdersForPlate();
+  plateEl.addEventListener('blur', handler);
+  plateEl.addEventListener('change', handler);
+}
+
+
 // ---- v3f: 車両固有 規定圧メモリ（localStorage） ----
 function normalizePlateKey(s){
   if(!s) return "";

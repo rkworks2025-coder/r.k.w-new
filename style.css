@@ -47,4 +47,5 @@ button {
   padding: 10px;
   background: #171a21;
   border-radius: 8px;
+  white-space: pre-wrap; /* 結果を見やすく */
 }

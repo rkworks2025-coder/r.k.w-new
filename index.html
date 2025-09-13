@@ -1,68 +1,111 @@
-<script>
-// --- 追加: URL → 入力初期化 ---
-function applyParamsFromURL(){
-  const sp = new URL(location.href).searchParams;
-  const q = k => sp.get(k) || "";
-  if (document.querySelector('[name="station"]') && sp.has('station'))
-    document.querySelector('[name="station"]').value = q('station');
-  if (document.querySelector('[name="model"]') && sp.has('model'))
-    document.querySelector('[name="model"]').value   = q('model');
-  // 巡回アプリ側のキーが plate or plate_full か両対応
-  const plate = sp.get('plate_full') || sp.get('plate') || "";
-  if (document.querySelector('[name="plate_full"]') && plate)
-    document.querySelector('[name="plate_full"]').value = plate;
-}
+<!DOCTYPE html>
 
-// --- 追加: 車両ごとの保存キー ---
-function buildKey(plate_full, station){
-  const p = (plate_full||"").replace(/\s+/g,"");
-  const s = (station||"").replace(/\s+/g,"");
-  return `tirelog_${p}_${s}`;
-}
+<html lang="ja">
+<head><link href="style.css" rel="stylesheet"/>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>タイヤ点検アプリ | v3a (3-file split)</title>
+</head>
+<body>
+<div id="app">
+  <header class="app-header">
+    <h1>タイヤ点検アプリ (v3a (3-file split))</h1>
+  </header>
 
-// --- 追加: 結果表示（既存UIに合わせて整形） ---
-function renderResult(p){
-  // 会社アプリの入力順に合わせた行
-  const lines = [
-    `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}   RF`,
-    `${p.tread_lf} ${p.pre_lf} ${p.dot_lf}   LF`,
-    `${p.tread_lr} ${p.pre_lr} ${p.dot_lr}   LR`,
-    `${p.tread_rr} ${p.pre_rr} ${p.dot_rr}   RR`,
-    '',
-    p.savedAt || nowJST()
-  ].join('\n');
+  <main id="view-input" class="view active">
+    <section class="card">
+      <h2 class="card-title">車両情報</h2>
+      <div class="grid grid-2">
+        <label class="field">
+          <span class="label">ステーション名</span>
+          <input id="station" type="text" placeholder="例: タイムズ〇〇"/>
+        </label>
+        <label class="field">
+          <span class="label">車種</span>
+          <input id="model" type="text" placeholder="例: ソリオ"/>
+        </label>
+        <label class="field">
+          <span class="label">車番（フルナンバー）</span>
+          <input id="plate" type="text" placeholder="例: 多摩502わ1234"/>
+        </label>
+      </div>
+    </section>
 
-  // ★ ステーション名を最上段に追加
-  document.getElementById('res_header').textContent =
-    `${p.station||''}\n${p.plate_full||''}\n${p.model||''}`;
+    <section class="card">
+      <h2 class="card-title">作業時刻</h2>
+      <div class="time-row">
+        <button id="btn-unlock" class="btn btn-secondary">解錠　--:--</button>
+        <button id="btn-lock" class="btn btn-secondary">施錠　--:--</button>
+      </div>
+    </section>
 
-  document.getElementById('res_times').innerHTML =
-    `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
+    <section class="card">
+      <h2 class="card-title">タイヤ計測（入力順: 右前 → 左前 → 左後 → 右後）</h2>
 
-  document.getElementById('res_lines').textContent = lines;
+      <div class="wheel-card" data-wheel="RF">
+        <div class="wheel-head">
+          <span class="wheel-name">右前 (RF)</span>
+        </div>
+        <div class="grid grid-3">
+          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
+          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
+          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
+          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+        </div>
+      </div>
 
-  // 既存の画面切替（そのまま）
-  document.getElementById('form').style.display = 'none';
-  document.getElementById('resultCard').style.display = 'block';
-  window.scrollTo({top:0, behavior:'smooth'});
-}
+      <div class="wheel-card" data-wheel="LF">
+        <div class="wheel-head">
+          <span class="wheel-name">左前 (LF)</span>
+        </div>
+        <div class="grid grid-3">
+          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
+          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
+          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
+          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+        </div>
+      </div>
 
-// --- 追加: 保存済みがあれば自動復元（同一車両のみ） ---
-function tryRestoreFromLocal(){
-  const station = document.querySelector('[name="station"]')?.value || '';
-  const plate   = document.querySelector('[name="plate_full"]')?.value || '';
-  if (!station || !plate) return;
-  const saved = localStorage.getItem(buildKey(plate, station));
-  if (!saved) return;
-  try {
-    const p = JSON.parse(saved);
-    renderResult(p);
-  } catch(_) {}
-}
+      <div class="wheel-card" data-wheel="LR">
+        <div class="wheel-head">
+          <span class="wheel-name">左後 (LR)</span>
+        </div>
+        <div class="grid grid-3">
+          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
+          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
+          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
+          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+        </div>
+      </div>
 
-// 起動時：URL反映→あれば復元（UIは変えない）
-document.addEventListener('DOMContentLoaded', ()=>{
-  applyParamsFromURL();
-  tryRestoreFromLocal();
-});
-</script>
+      <div class="wheel-card" data-wheel="RR">
+        <div class="wheel-head">
+          <span class="wheel-name">右後 (RR)</span>
+        </div>
+        <div class="grid grid-3">
+          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
+          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
+          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
+          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btn-submit" class="btn btn-primary">完了 → 結果表示</button>
+      </div>
+    </section>
+  </main>
+
+  <main id="view-result" class="view">
+    <section class="card">
+      <h2 class="card-title">結果</h2>
+      <div id="result-body" class="result-body"></div>
+      <div class="actions">
+        <button id="btn-back" class="btn btn-secondary">戻る</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script defer="True" src="app.js"></script></body>
+</html>

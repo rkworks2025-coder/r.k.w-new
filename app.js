@@ -496,9 +496,7 @@ form.addEventListener('submit', async (ev) => {
   try{ ev.preventDefault(); }catch(_){}
   const p = buildPayload();
   try{ if(!guardBeforeSubmit(p)) return; }catch(_){ /* no guard configured */ }
-
-  const p = buildPayload();
-  const lines=[
+const lines=[
     `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}${(p.std_f&&p.std_r)?`    ${p.std_f}-${p.std_r}`:''}   RF`,
     `${p.tread_lf} ${p.pre_lf} ${p.dot_lf}   LF`,
     `${p.tread_lr} ${p.pre_lr} ${p.dot_lr}   LR`,

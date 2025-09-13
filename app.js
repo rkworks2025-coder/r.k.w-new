@@ -101,7 +101,7 @@ form.addEventListener('submit', async () => {
     '',
     nowJST()
   ].join('\n');
-  resHeader.textContent = `${document.querySelector('#station')?.value || ''}
+  resHeader.textContent = `${p.station}
 ${p.plate_full}
 ${p.model}`;
   resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;

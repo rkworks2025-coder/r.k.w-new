@@ -1,117 +1,76 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>タイヤ点検 | v3c (3-file split parity+fix)</title>
-  <link rel="stylesheet" href="style.css"/>
-</head>
-<body>
-<div id="app">
-  <header class="app-header">
-    <h1>タイヤ点検</h1>
-    <div class="header-right"><div id="now" class="now"></div><div class="ver-badge" aria-label="version">v3c</div></div>
-  </header>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+<title>タイヤ点検アプリ（本番・黒×オレンジ）</title>
 
-  <main id="view-input" class="view active">
-    <section class="card">
-      <h2 class="card-title">車両情報</h2>
-      <div class="grid grid-2">
-        <label class="field">
-          <span class="label">ステーション名</span>
-          <input id="station" type="text" placeholder="例: タイムズ〇〇"/>
-        </label>
-        <label class="field">
-          <span class="label">車種</span>
-          <input id="model" type="text" placeholder="例: C-HR"/>
-        </label>
-        <label class="field">
-          <span class="label">フルナンバー</span>
-          <input id="plate" type="text" placeholder="例: 多摩502わ1234"/>
-        </label>
-        <label class="field">
-          <span class="label">規定圧（前） kPa 任意</span>
-          <input id="std-pre" type="number" inputmode="numeric"/>
-        </label>
-        <label class="field">
-          <span class="label">規定圧（後） kPa 任意</span>
-          <input id="std-post" type="number" inputmode="numeric"/>
-        </label>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2 class="card-title">作業時刻</h2>
-      <div class="time-block">
-        <div class="time-col">
-          <div class="time-label">解錠</div>
-          <button id="btn-unlock" class="btn-mini">記録</button>
-          <div id="unlock-time" class="time-value">--:--</div>
-        </div>
-        <div class="time-col">
-          <div class="time-label">施錠</div>
-          <button id="btn-lock" class="btn-mini">記録</button>
-          <div id="lock-time" class="time-value">--:--</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2 class="card-title">タイヤ別入力</h2>
-
-      <div class="wheel-row" data-wheel="RF">
-        <div class="grid grid-3">
-          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
-          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
-          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
-        </div>
-        <div class="wheel-tag">RF</div>
-      </div>
-
-      <div class="wheel-row" data-wheel="LF">
-        <div class="grid grid-3">
-          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
-          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
-          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
-        </div>
-        <div class="wheel-tag">LF</div>
-      </div>
-
-      <div class="wheel-row" data-wheel="LR">
-        <div class="grid grid-3">
-          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
-          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
-          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
-        </div>
-        <div class="wheel-tag">LR</div>
-      </div>
-
-      <div class="wheel-row" data-wheel="RR">
-        <div class="grid grid-3">
-          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
-          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
-          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
-        </div>
-        <div class="wheel-tag">RR</div>
-      </div>
-
-      <div class="actions">
-        <button id="btn-submit" class="btn btn-primary">完了 → 結果表示</button>
-      </div>
-    </section>
-  </main>
-
-  <main id="view-result" class="view">
-    <section class="card">
-      <h2 class="card-title">結果</h2>
-      <div id="result-txt" class="result-txt mono"></div>
-      <div class="actions">
-        <button id="btn-back" class="btn btn-secondary">入力に戻る</button>
-      </div>
-    </section>
-  </main>
+<link href="style.css?v=v3d" rel="stylesheet"/></head>
+<body><div aria-label="version" class="ver-badge">v3d</div>
+<header>
+<h1>タイヤ点検</h1>
+<span id="now">--/-- --:--</span>
+</header>
+<div class="wrap">
+<form class="card" id="form" onsubmit="return false;">
+<p class="title">車両情報</p>
+<div class="veh-rows">
+<div><label>ステーション名 <input name="station" required="" type="text"/></label></div>
+<div class="veh-row2">
+<div><label>車種 <input name="model" required="" type="text"/></label></div>
+<div><label>フルナンバー <input name="plate_full" required="" type="text"/></label></div>
 </div>
+<div class="std-row">
+<div><label>規定圧（前）kPa <span class="hint">任意</span><input inputmode="numeric" name="std_f" type="text"/></label></div>
+<div><label>規定圧（後）kPa <span class="hint">任意</span><input inputmode="numeric" name="std_r" type="text"/></label></div>
+</div>
+<div class="time-stamp">
+<div class="stamp-card">
+<div class="stamp-head"><div class="stamp-title">解錠</div><button class="stamp-btn" id="unlockBtn" type="button">記録</button></div>
+<div class="stamp-time" id="unlockTime">--:--</div>
+<div class="muted" id="unlockNote"></div>
+</div>
+<div class="stamp-card">
+<div class="stamp-head"><div class="stamp-title">施錠</div><button class="stamp-btn" id="lockBtn" type="button">記録</button></div>
+<div class="stamp-time" id="lockTime">--:--</div>
+<div class="muted" id="lockNote"></div>
+</div>
+</div>
+</div>
+<p class="title section">タイヤ別入力</p>
+<div class="tire-list">
+<div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_rf" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">空気圧</div><input id="pre_rf" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">製造年週</div><input id="dot_rf" inputmode="numeric" maxlength="4" type="text"/></div>
+<div class="lab">RF</div></div>
+<div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_lf" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">空気圧</div><input id="pre_lf" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">製造年週</div><input id="dot_lf" inputmode="numeric" maxlength="4" type="text"/></div>
+<div class="lab">LF</div></div>
+<div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_lr" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">空気圧</div><input id="pre_lr" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">製造年週</div><input id="dot_lr" inputmode="numeric" maxlength="4" type="text"/></div>
+<div class="lab">LR</div></div>
+<div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_rr" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">空気圧</div><input id="pre_rr" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">製造年週</div><input id="dot_rr" inputmode="numeric" maxlength="4" type="text"/></div>
+<div class="lab">RR</div></div>
+</div>
+<div class="foot section">
+<button class="btn" type="reset">クリア</button>
+<button class="btn primary" id="submitBtn" type="submit">完了 → 結果表示</button>
+</div>
+</form>
+<div class="card" id="resultCard" style="display:none;">
+<p class="title">結果</p>
+<div class="mono" id="res_header"></div>
+<div class="mono" id="res_times"></div>
+<div class="mono" id="res_lines"></div>
+<div class="foot section"><button class="btn" id="backBtn">入力に戻る</button></div>
+</div>
+</div>
+<div class="toast" id="toast">送信しました</div>
 
-<script src="app.js" defer></script>
-</body>
+<script defer="True" src="app.js?v=v3d"></script></body>
 </html>

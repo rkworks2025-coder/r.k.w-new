@@ -1,138 +1,111 @@
-const WEB_APP_URL = 'https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec'; // 差し替え可
 
-const qs=(s,e=document)=>e.querySelector(s);
-const qsa=(s,e=document)=>Array.from(e.querySelectorAll(s));
-const wheels=["RF","LF","LR","RR"];
+// Web App URL (unchanged)
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Lgz61Wc_M5ajTrKtUmR0xnm2BvRyx4b7XYVuTfM92sbaW3RSMwIyVCVEgWzi2mJp/exec';
 
-function nowText(){
-  const d=new Date();
-  const mm=String(d.getMonth()+1).padStart(2,'0');
-  const dd=String(d.getDate()).padStart(2,'0');
-  const hh=String(d.getHours()).padStart(2,'0');
-  const m =String(d.getMinutes()).padStart(2,'0');
-  return `${mm}/${dd} ${hh}:${m}`;
+// Set current date/time in JST
+function nowJST(){
+  const d=new Date();const utc=d.getTime()+d.getTimezoneOffset()*60000;const jst=new Date(utc+9*60*60000);
+  const HH=String(jst.getHours()).padStart(2,'0');const MM=String(jst.getMinutes()).padStart(2,'0');
+  const mm=String(jst.getMonth()+1).padStart(2,'0');const dd=String(jst.getDate()).padStart(2,'0');
+  return mm+'/'+dd+' '+HH+':'+MM;
 }
-function setClock(){ qs('#now').textContent = nowText(); }
+function nowHM(){
+  const d=new Date();const utc=d.getTime()+d.getTimezoneOffset()*60000;const jst=new Date(utc+9*60*60000);
+  const HH=String(jst.getHours()).padStart(2,'0');const MM=String(jst.getMinutes()).padStart(2,'0');
+  return `${HH}:${MM}`;
+}
+document.getElementById('now').textContent=nowJST();
 
-function toDepth(s){
-  s = String(s||'').trim();
-  if(!s) return '';
-  if(/^\d{2,3}$/.test(s)){
-    if(s.length===2) return `${s[0]}.${s[1]}`;
-    return `${s.slice(0,-1)}.${s.slice(-1)}`;
-  }
-  return s.replace(',','.');
+// Prefill form fields from query parameters
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const station = params.get('station');
+  const model   = params.get('model');
+  const plate   = params.get('plate_full');
+  if (station) document.querySelector('[name="station"]').value = station;
+  if (model)   document.querySelector('[name="model"]').value   = model;
+  if (plate)   document.querySelector('[name="plate_full"]').value = plate;
+});
+
+// Time stamp buttons
+const unlockBtn=document.getElementById('unlockBtn'); const lockBtn=document.getElementById('lockBtn');
+const unlockTimeEl=document.getElementById('unlockTime'); const lockTimeEl=document.getElementById('lockTime');
+const unlockNote=document.getElementById('unlockNote'); const lockNote=document.getElementById('lockNote');
+function stamp(el,noteEl){
+  const t=nowHM(),prev=el.textContent; el.textContent=t;
+  noteEl.textContent=(prev && prev!=='--:--')?('更新: '+t):'記録しました';
+  setTimeout(()=>noteEl.textContent='',1200);
+}
+unlockBtn.addEventListener('click',()=>{ stamp(unlockTimeEl,unlockNote); lockBtn.focus(); });
+lockBtn.addEventListener('click',()=>{ stamp(lockTimeEl,lockNote); document.getElementById('tread_rf').focus(); });
+
+// Auto-advance input fields
+const order=['tread_rf','pre_rf','dot_rf','tread_lf','pre_lf','dot_lf','tread_lr','pre_lr','dot_lr','tread_rr','pre_rr','dot_rr'];
+function focusNext(currId){
+  const i=order.indexOf(currId);
+  if(i>=0 && i<order.length-1){ const next=document.getElementById(order[i+1]); if(next){ next.focus(); next.select?.(); } }
+  else if(i===order.length-1){ const btn=document.getElementById('submitBtn'); btn.classList.add('focus-ring'); btn.focus(); setTimeout(()=>btn.classList.remove('focus-ring'),1200); }
+}
+function autoFormatTread(el){
+  let v=el.value.replace(/[^0-9]/g,'');
+  if(/\./.test(v)){ el.value=v; return; }
+  if(/^\d{2}$/.test(v)){ el.value=v[0]+'.'+v[1]; focusNext(el.id); } else { el.value=v; }
+}
+function autoAdvancePressure(el){
+  const v=el.value.replace(/[^0-9]/g,''); el.value=v; if(v.length>=3){ focusNext(el.id); }
+}
+function autoAdvanceDOT(el){
+  const v=el.value.replace(/[^0-9]/g,''); el.value=v.slice(0,4); if(el.value.length===4){ focusNext(el.id); }
+}
+['rf','lf','lr','rr'].forEach(pos=>{
+  document.getElementById('tread_'+pos).addEventListener('input',e=>autoFormatTread(e.target));
+  document.getElementById('pre_'+pos).addEventListener('input',e=>autoAdvancePressure(e.target));
+  document.getElementById('dot_'+pos).addEventListener('input',e=>autoAdvanceDOT(e.target));
+});
+
+// Toast notifications
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1400); }
+
+async function postToSheet(payload){
+  fetch(WEB_APP_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) });
+  showToast('送信しました');
 }
 
-function recordTime(id){
-  const d=new Date();
-  const hh=String(d.getHours()).padStart(2,'0');
-  const mm=String(d.getMinutes()).padStart(2,'0');
-  const el=qs(id);
-  el.textContent = `${hh}:${mm}`;
-  el.dataset.time = `${hh}:${mm}`;
-}
-
-function collect(){
-  const m={
-    station: qs('#station').value.trim(),
-    car: qs('#model').value.trim(),
-    plate: qs('#plate').value.trim(),
-    stdPre: qs('#std-pre').value.trim(),
-    stdPost: qs('#std-post').value.trim(),
-    unlock: qs('#unlock-time').dataset.time || '',
-    lock: qs('#lock-time').dataset.time || '',
-    ts: nowText(),
-    wheels:{}
+// Form submission
+const form=document.getElementById('form'); const resultCard=document.getElementById('resultCard');
+const resHeader=document.getElementById('res_header'); const resTimes=document.getElementById('res_times'); const resLines=document.getElementById('res_lines');
+function buildPayload(){
+  const gv = sel => document.querySelector(sel)?.value || '';
+  const g  = id  => document.getElementById(id)?.value || '';
+  return {
+    station: gv('[name="station"]'),
+    model:   gv('[name="model"]'),
+    plate_full: gv('[name="plate_full"]'),
+    unlock: unlockTimeEl.textContent || '',
+    lock:   lockTimeEl.textContent   || '',
+    tread_rf: g('tread_rf'), pre_rf: g('pre_rf'), dot_rf: g('dot_rf'),
+    tread_lf: g('tread_lf'), pre_lf: g('pre_lf'), dot_lf: g('dot_lf'),
+    tread_lr: g('tread_lr'), pre_lr: g('pre_lr'), dot_lr: g('dot_lr'),
+    tread_rr: g('tread_rr'), pre_rr: g('pre_rr'), dot_rr: g('dot_rr'),
+    std_f: gv('[name="std_f"]'),
+    std_r: gv('[name="std_r"]')
   };
-  qsa('.wheel-row').forEach(row=>{
-    const w=row.dataset.wheel;
-    m.wheels[w]={
-      depth: toDepth(qs('.input-depth',row).value),
-      press: qs('.input-press',row).value.trim(),
-      week: qs('.input-week',row).value.trim()
-    };
-  });
-  return m;
 }
+form.addEventListener('submit', async () => {
+  const p = buildPayload();
+  const lines=[
+    `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}${(p.std_f&&p.std_r)?`    ${p.std_f}-${p.std_r}`:''}   RF`,
+    `${p.tread_lf} ${p.pre_lf} ${p.dot_lf}   LF`,
+    `${p.tread_lr} ${p.pre_lr} ${p.dot_lr}   LR`,
+    `${p.tread_rr} ${p.pre_rr} ${p.dot_rr}   RR`,
+    '',
+    nowJST()
+  ].join('\n');
+  resHeader.textContent = `${p.plate_full}\n${p.model}`;
+  resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
+  resLines.textContent  = lines;
+  form.style.display='none'; resultCard.style.display='block'; window.scrollTo({top:0,behavior:'smooth'});
+  await postToSheet(p);
+});
+document.getElementById('backBtn').addEventListener('click',()=>{ resultCard.style.display='none'; form.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); });
 
-// 左寄せ等幅でカラム風整列
-function padLeft(v, n){ v=String(v||''); return v.length>=n? v : ' '.repeat(n - v.length) + v; }
-function padRight(v, n){ v=String(v||''); return v.length>=n? v : v + ' '.repeat(n - v.length); }
-
-function renderResult(m){
-  const lines=[];
-  if(m.plate) lines.push(m.plate);
-  if(m.car)   lines.push(m.car);
-  lines.push(`解錠　 ${m.unlock||'--:--'}`);
-  lines.push(`施錠　 ${m.lock||'--:--'}`);
-
-  wheels.forEach(w=>{
-    const d=m.wheels[w]||{};
-    const depth = padLeft(d.depth, 4);   // _5.6
-    const press = padLeft(d.press, 3);   // 240
-    const week  = padLeft(d.week, 4);    // 4822
-    const txt = `${depth} ${press} ${week}  ${w}`;
-    lines.push(txt);
-  });
-
-  lines.push('');
-  lines.push(m.ts);
-
-  qs('#result-txt').textContent = lines.join('\n');
-}
-
-async function save(m){
-  try{
-    localStorage.setItem('tire:last', JSON.stringify(m));
-    if (WEB_APP_URL && /https?:\/\//.test(WEB_APP_URL)){
-      await fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(m)});
-    }
-  }catch(e){ console.error(e); }
-}
-
-function setupAdvance(){
-  wheels.forEach((w, idx)=>{
-    const row = qs(`.wheel-row[data-wheel="${w}"]`);
-    const inputs = [qs('.input-depth',row), qs('.input-press',row), qs('.input-week',row)];
-    inputs.forEach((el,i)=>{
-      el.addEventListener('keydown', ev=>{
-        if(ev.key==='Enter'){
-          ev.preventDefault();
-          if(i<inputs.length-1) inputs[i+1].focus();
-          else{
-            const next = wheels[idx+1];
-            if(next) qs(`.wheel-row[data-wheel="${next}"] .input-depth`).focus();
-            else qs('#btn-submit').focus();
-          }
-        }
-      });
-    });
-  });
-}
-
-function show(id){
-  qsa('.view').forEach(v=>v.classList.remove('active'));
-  qs(id).classList.add('active');
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-function init(){
-  setClock(); setInterval(setClock, 15*1000);
-
-  qs('#btn-unlock').addEventListener('click', ()=>recordTime('#unlock-time'));
-  qs('#btn-lock').addEventListener('click', ()=>recordTime('#lock-time'));
-
-  qs('#btn-submit').addEventListener('click', async ()=>{
-    if(!confirm('よろしいですか？')) return;
-    const m = collect();
-    renderResult(m);
-    await save(m);
-    show('#view-result');
-  });
-
-  qs('#btn-back').addEventListener('click', ()=> show('#view-input'));
-
-  setupAdvance();
-}
-document.addEventListener('DOMContentLoaded', init);

@@ -1,4 +1,103 @@
 
+// ---- v3k: 結果ヘッダーに確実にステーション名を表示（DOM保証・URL/入力の双方対応） ----
+(function(){
+  // 強いURLデコード（+を空白、二重エンコードにも耐性）
+  function strongDecode(s){
+    try{
+      s = (s||'').replace(/\+/g,' ');
+      try{ return decodeURIComponent(s); }catch(_){ return s; }
+    }catch(_){ return s||''; }
+  }
+
+  // URLパラメータ取得（station / st / s を許容）
+  if (typeof window.APP_CTX === 'undefined') window.APP_CTX = {};
+  (function parseParams(){
+    const out = {};
+    const q = (location.search||'').replace(/^\?/,'').split('&').filter(Boolean);
+    for(const p of q){
+      const i = p.indexOf('=');
+      const k = strongDecode(i>=0 ? p.slice(0,i) : p).toLowerCase();
+      const v = strongDecode(i>=0 ? p.slice(i+1) : '');
+      out[k] = v;
+    }
+    APP_CTX.paramStation = out.station || out.st || out.s || null;
+    APP_CTX.paramPlate   = out.plate   || out.p  || null;
+    APP_CTX.paramModel   = out.model   || out.m  || null;
+  })();
+
+  // DOMとスタイルを保証
+  function ensureResHeaderDom(){
+    try{
+      const card = document.querySelector('#resultCard') || document.querySelector('#view-result');
+      if(!card) return null;
+      let hdr = document.querySelector('#res_header');
+      if(!hdr){
+        hdr = document.createElement('div');
+        hdr.id = 'res_header';
+        hdr.className = 'mono big';
+        card.insertBefore(hdr, card.firstElementChild);
+      }
+      // style保険（念のため）
+      if(!document.querySelector('#__res_header_style__')){
+        const st = document.createElement('style');
+        st.id = '__res_header_style__';
+        st.textContent = '.mono{font-family:SFMono-Regular,Menlo,Consolas,monospace}.big{font-size:22px;white-space:pre}';
+        document.head.appendChild(st);
+      }
+      return hdr;
+    }catch(_){ return null; }
+  }
+
+  function getStationFromContext(){
+    const fromParam = (APP_CTX.paramStation||'').trim();
+    if (fromParam) return fromParam;
+    const el = document.querySelector('#station');
+    return (el && el.value) ? el.value : '';
+  }
+
+  // 結果ヘッダー更新
+  window.updateResultHeader = function(payload){
+    const hdr = ensureResHeaderDom();
+    if(!hdr) return;
+    const station = getStationFromContext();
+    const plate = (payload && payload.plate_full) || '';
+    const model = (payload && payload.model) || '';
+    const lines = [];
+    if (station) lines.push(station);
+    if (plate)   lines.push(plate);
+    if (model)   lines.push(model);
+    hdr.textContent = lines.join('\\n');
+  };
+
+  // 送信前ガード（URLでplate/stationが来ている場合は一致確認）
+  window.guardBeforeSubmit = function(payload){
+    function normPlate(s){
+      if(!s) return '';
+      const toNarrow = s.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/　/g,' ');
+      return toNarrow.trim().toLowerCase().replace(/\s+/g,'').replace(/[－–ー―]/g,'-');
+    }
+    if (APP_CTX.paramPlate){
+      if (normPlate(APP_CTX.paramPlate) !== normPlate(payload.plate_full||payload.plate||'')){
+        alert('巡回アプリの車両と一致しません（フルナンバー）。');
+        return false;
+      }
+    }
+    if (APP_CTX.paramStation){
+      const s1 = (APP_CTX.paramStation||'').trim();
+      const s2 = (payload.station||'').trim();
+      if (s1 && s2 && s1 !== s2){
+        alert('巡回アプリのステーション名と一致しません。');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 初期化時に一度だけヘッダーを用意
+  document.addEventListener('DOMContentLoaded', ()=>{ ensureResHeaderDom(); });
+})();
+
+
 // v3h2: station banner DOMをJSで保証（index.htmlが古くても動く）
 function ensureStationBannerDom(){
   try{
@@ -403,7 +502,7 @@ form.addEventListener('submit', async () => {
     '',
     nowJST()
   ].join('\n');
-  resHeader.textContent = `${p.plate_full}\n${p.model}`;
+  updateResultHeader(p);
   resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
   resLines.textContent  = lines;
   form.style.display='none'; resultCard.style.display='block'; window.scrollTo({top:0,behavior:'smooth'});

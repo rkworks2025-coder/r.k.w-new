@@ -1,4 +1,72 @@
 
+// ---- v3e: 内蔵 規定圧マスタ（編集可） ----
+const PRESSURE_MASTER = {
+  "c-hr":    { front:240, rear:240 },
+  "solio":   { front:240, rear:240 },
+  "aqua":    { front:240, rear:240 },
+  "fit":     { front:240, rear:240 },
+  "yaris":   { front:240, rear:240 },
+  "note":    { front:240, rear:240 },
+  "swift":   { front:240, rear:240 },
+  "mazda2":  { front:240, rear:240 },
+  "wagonr":  { front:240, rear:240 },
+};
+
+// 全角→半角・トリム・小文字化・簡易正規化
+function normalizeModelKey(s){
+  if(!s) return "";
+  // 全角→半角
+  const toNarrow = s.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+                    .replace(/　/g, ' ');
+  const t = toNarrow.trim().toLowerCase().replace(/\s+/g,'').replace(/-/g,'');
+  // 和名の簡易マップ
+  if (t.includes("ソリオ") || s.includes("ソリオ")) return "solio";
+  if (t.includes("アクア") || s.includes("アクア")) return "aqua";
+  if (t.includes("フィット") || s.includes("フィット")) return "fit";
+  if (t.includes("ヤリス") || s.includes("ヤリス")) return "yaris";
+  if (t.includes("ノート") || s.includes("ノート")) return "note";
+  if (t.includes("スイフト") || s.includes("スイフト")) return "swift";
+  if (t.includes("マツダ2") || s.includes("マツダ2")) return "mazda2";
+  if (t.includes("ワゴンr") || s.includes("ワゴンR") || s.includes("ワゴンｒ")) return "wagonr";
+  // ローマ字・英数での一致
+  if (t.includes("chr")) return "c-hr";
+  if (t.includes("mazda2")) return "mazda2";
+  if (t.includes("wagonr")) return "wagonr";
+  if (t.includes("solio")) return "solio";
+  if (t.includes("aqua")) return "aqua";
+  if (t.includes("fit")) return "fit";
+  if (t.includes("yaris")) return "yaris";
+  if (t.includes("note")) return "note";
+  if (t.includes("swift")) return "swift";
+  return t;
+}
+
+// 規定圧の取得（Phase A: 内蔵マスタ）
+function getPressure(modelInput){
+  const key = normalizeModelKey(modelInput);
+  const rec = PRESSURE_MASTER[key];
+  if (rec) return { front: rec.front, rear: rec.rear, source: 'local', version: 'v3e' };
+  return { front: null, rear: null, source: 'none', version: 'v3e' };
+}
+
+// モデル確定時に自動反映（空欄のときだけ上書き）
+function setupPressureAutofill(){
+  const modelEl = document.querySelector('#model');
+  const preEl   = document.querySelector('#std-pre');
+  const postEl  = document.querySelector('#std-post');
+  if(!modelEl || !preEl || !postEl) return;
+
+  const apply = ()=>{
+    const res = getPressure(modelEl.value);
+    if (res.front != null && preEl.value.trim() === '') preEl.value = res.front;
+    if (res.rear  != null && postEl.value.trim() === '') postEl.value = res.rear;
+    // 必要なら将来ここで小さなトースト表示も可能（今回はUI変更なし）
+  };
+  modelEl.addEventListener('blur', apply);
+  modelEl.addEventListener('change', apply);
+}
+
+
 // Web App URL (unchanged)
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Lgz61Wc_M5ajTrKtUmR0xnm2BvRyx4b7XYVuTfM92sbaW3RSMwIyVCVEgWzi2mJp/exec';
 

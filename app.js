@@ -1,4 +1,4 @@
-const WEB_APP_URL = 'https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec'; // 既存に合わせて差し替え可
+const WEB_APP_URL = 'https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec'; // 差し替え可
 
 const qs=(s,e=document)=>e.querySelector(s);
 const qsa=(s,e=document)=>Array.from(e.querySelectorAll(s));
@@ -24,16 +24,17 @@ function toDepth(s){
   return s.replace(',','.');
 }
 
-function recordTime(targetId){
+function recordTime(id){
   const d=new Date();
   const hh=String(d.getHours()).padStart(2,'0');
   const mm=String(d.getMinutes()).padStart(2,'0');
-  qs(targetId).textContent = `${hh}:${mm}`;
-  qs(targetId).dataset.time = `${hh}:${mm}`;
+  const el=qs(id);
+  el.textContent = `${hh}:${mm}`;
+  el.dataset.time = `${hh}:${mm}`;
 }
 
 function collect(){
-  const model={
+  const m={
     station: qs('#station').value.trim(),
     car: qs('#model').value.trim(),
     plate: qs('#plate').value.trim(),
@@ -46,33 +47,35 @@ function collect(){
   };
   qsa('.wheel-row').forEach(row=>{
     const w=row.dataset.wheel;
-    model.wheels[w]={
+    m.wheels[w]={
       depth: toDepth(qs('.input-depth',row).value),
       press: qs('.input-press',row).value.trim(),
       week: qs('.input-week',row).value.trim()
     };
   });
-  return model;
+  return m;
 }
+
+// 左寄せ等幅でカラム風整列
+function padLeft(v, n){ v=String(v||''); return v.length>=n? v : ' '.repeat(n - v.length) + v; }
+function padRight(v, n){ v=String(v||''); return v.length>=n? v : v + ' '.repeat(n - v.length); }
 
 function renderResult(m){
   const lines=[];
-  // 上部2行（元安定版に近い順）
   if(m.plate) lines.push(m.plate);
   if(m.car)   lines.push(m.car);
-  if(m.unlock) lines.push(`解錠　 ${m.unlock}`);
-  else lines.push(`解錠　 --:--`);
-  if(m.lock) lines.push(`施錠　 ${m.lock}`);
-  else lines.push(`施錠　 --:--`);
+  lines.push(`解錠　 ${m.unlock||'--:--'}`);
+  lines.push(`施錠　 ${m.lock||'--:--'}`);
 
-  // タイヤ行
   wheels.forEach(w=>{
     const d=m.wheels[w]||{};
-    const a=[d.depth||'', d.press||'', d.week||'', w].join(' ');
-    lines.push(a);
+    const depth = padLeft(d.depth, 4);   // _5.6
+    const press = padLeft(d.press, 3);   // 240
+    const week  = padLeft(d.week, 4);    // 4822
+    const txt = `${depth} ${press} ${week}  ${w}`;
+    lines.push(txt);
   });
 
-  // フッター時刻
   lines.push('');
   lines.push(m.ts);
 
@@ -89,7 +92,6 @@ async function save(m){
 }
 
 function setupAdvance(){
-  // Enterで次へ（RF→LF→LR→RR）
   wheels.forEach((w, idx)=>{
     const row = qs(`.wheel-row[data-wheel="${w}"]`);
     const inputs = [qs('.input-depth',row), qs('.input-press',row), qs('.input-week',row)];

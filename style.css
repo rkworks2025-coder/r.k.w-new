@@ -40,12 +40,13 @@ input[type="text"],input[type="number"]{
 .time-block{ display:flex; gap:16px; justify-content:space-between; flex-wrap:wrap; }
 .time-col{ flex:1 1 160px; background:#141414; border:1px dashed #333; border-radius:12px; padding:10px; text-align:center; }
 .time-label{ color:var(--muted); margin-bottom:6px; }
-.chip{ appearance:none; border:1px solid #444; background:#202020; color:#fff; border-radius:999px; padding:6px 12px; font-size:16px; cursor:pointer; }
+.btn-mini{ appearance:none; border:1px solid #444; background:#202020; color:#fff; border-radius:10px; padding:6px 12px; font-size:16px; cursor:pointer; }
 .time-value{ font-size:28px; margin-top:6px; letter-spacing:1px; }
 
 /* wheel rows */
-.wheel-row{ position:relative; border:1px solid #2d2d2d; border-radius:12px; padding:10px; margin:12px 0; background:#141414; }
-.wheel-tag{ position:absolute; right:10px; top:50%; transform:translateY(-50%); color:#cfcfcf; font-weight:700; }
+.wheel-row{ position:relative; border:1px solid #2d2d2d; border-radius:12px; padding:10px; padding-right:60px; margin:12px 0; background:#141414; }
+.wheel-tag{ position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#cfcfcf; font-weight:700; pointer-events:none; }
+@media (max-width:480px){ .wheel-row{ padding-right:56px; } }
 
 /* buttons */
 .actions{ display:flex; gap:10px; justify-content:flex-end; }
@@ -59,7 +60,7 @@ input[type="text"],input[type="number"]{
 
 /* result mono text like original */
 .mono{ font-family:var(--mono); }
-.result-txt{ white-space:pre-wrap; line-height:1.8; font-size:22px; padding:6px 2px; }
+.result-txt{ white-space:pre; line-height:1.9; font-size:22px; padding:6px 2px; }
 
 /* small screens tweak */
 @media (max-width:380px){ .result-txt{ font-size:20px; } }

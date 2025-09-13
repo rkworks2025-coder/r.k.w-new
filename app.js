@@ -1,4 +1,30 @@
 
+// v3h2: station banner DOMをJSで保証（index.htmlが古くても動く）
+function ensureStationBannerDom(){
+  try{
+    if(!document.querySelector('#station-top')){
+      const vr = document.querySelector('#view-result');
+      if(vr){
+        const el = document.createElement('div');
+        el.id = 'station-top';
+        el.className = 'station-top';
+        vr.insertBefore(el, vr.firstElementChild);
+      }
+    }
+  }catch(_){}
+}
+function ensureStationBannerStyle(){
+  try{
+    if(!document.querySelector('#__station_top_style__')){
+      const st = document.createElement('style');
+      st.id = '__station_top_style__';
+      st.textContent = '.station-top{ margin:8px 4px 6px; font-size:18px; font-weight:700; color:#fff; }';
+      document.head.appendChild(st);
+    }
+  }catch(_){}
+}
+
+
 // v3h1: 初期表示でバナー更新 & 駅名入力変更で追従
 function setupStationBannerLive(){
   try{

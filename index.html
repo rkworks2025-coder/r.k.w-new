@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-
 <html lang="ja">
-<head><link href="style.css" rel="stylesheet"/>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1" name="viewport"/>
-<title>タイヤ点検アプリ | v3a (3-file split)</title>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>タイヤ点検アプリ | v3b (3-file split parity)</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 <div id="app">
   <header class="app-header">
-    <h1>タイヤ点検アプリ (v3a (3-file split))</h1>
+    <h1>タイヤ点検</h1>
+    <div class="now" id="now"></div>
   </header>
 
   <main id="view-input" class="view active">
@@ -22,72 +23,76 @@
         </label>
         <label class="field">
           <span class="label">車種</span>
-          <input id="model" type="text" placeholder="例: ソリオ"/>
+          <input id="model" type="text" placeholder="例: C-HR"/>
         </label>
         <label class="field">
-          <span class="label">車番（フルナンバー）</span>
+          <span class="label">フルナンバー</span>
           <input id="plate" type="text" placeholder="例: 多摩502わ1234"/>
+        </label>
+        <label class="field">
+          <span class="label">規定圧（前） kPa 任意</span>
+          <input id="std-pre" type="number" inputmode="numeric" placeholder=""/>
+        </label>
+        <label class="field">
+          <span class="label">規定圧（後） kPa 任意</span>
+          <input id="std-post" type="number" inputmode="numeric" placeholder=""/>
         </label>
       </div>
     </section>
 
     <section class="card">
       <h2 class="card-title">作業時刻</h2>
-      <div class="time-row">
-        <button id="btn-unlock" class="btn btn-secondary">解錠　--:--</button>
-        <button id="btn-lock" class="btn btn-secondary">施錠　--:--</button>
+      <div class="time-block">
+        <div class="time-col">
+          <div class="time-label">解錠</div>
+          <button id="btn-unlock" class="chip">記録</button>
+          <div id="unlock-time" class="time-value">--:--</div>
+        </div>
+        <div class="time-col">
+          <div class="time-label">施錠</div>
+          <button id="btn-lock" class="chip">記録</button>
+          <div id="lock-time" class="time-value">--:--</div>
+        </div>
       </div>
     </section>
 
     <section class="card">
-      <h2 class="card-title">タイヤ計測（入力順: 右前 → 左前 → 左後 → 右後）</h2>
+      <h2 class="card-title">タイヤ別入力</h2>
 
-      <div class="wheel-card" data-wheel="RF">
-        <div class="wheel-head">
-          <span class="wheel-name">右前 (RF)</span>
-        </div>
+      <div class="wheel-row" data-wheel="RF">
         <div class="grid grid-3">
-          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
-          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
-          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
-          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
+          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
+          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
         </div>
+        <div class="wheel-tag">RF</div>
       </div>
 
-      <div class="wheel-card" data-wheel="LF">
-        <div class="wheel-head">
-          <span class="wheel-name">左前 (LF)</span>
-        </div>
+      <div class="wheel-row" data-wheel="LF">
         <div class="grid grid-3">
-          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
-          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
-          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
-          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
+          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
+          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
         </div>
+        <div class="wheel-tag">LF</div>
       </div>
 
-      <div class="wheel-card" data-wheel="LR">
-        <div class="wheel-head">
-          <span class="wheel-name">左後 (LR)</span>
-        </div>
+      <div class="wheel-row" data-wheel="LR">
         <div class="grid grid-3">
-          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
-          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
-          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
-          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
+          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
+          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
         </div>
+        <div class="wheel-tag">LR</div>
       </div>
 
-      <div class="wheel-card" data-wheel="RR">
-        <div class="wheel-head">
-          <span class="wheel-name">右後 (RR)</span>
-        </div>
+      <div class="wheel-row" data-wheel="RR">
         <div class="grid grid-3">
-          <label class="field"><span class="label">残溝 mm</span><input type="number" step="0.1" inputmode="decimal" class="input-depth" /></label>
-          <label class="field"><span class="label">空気圧 調整前 kPa</span><input type="number" inputmode="numeric" class="input-press-pre" /></label>
-          <label class="field"><span class="label">空気圧 調整後 kPa</span><input type="number" inputmode="numeric" class="input-press-post" /></label>
-          <label class="field"><span class="label">製造年週 4桁</span><input type="text" maxlength="4" class="input-week" placeholder="例: 2321"/></label>
+          <label class="field"><span class="label">残溝</span><input class="input-depth" type="number" step="0.1" inputmode="decimal"/></label>
+          <label class="field"><span class="label">空気圧 kPa</span><input class="input-press" type="number" inputmode="numeric"/></label>
+          <label class="field"><span class="label">製造年週</span><input class="input-week" type="text" maxlength="4" placeholder="例: 4822"/></label>
         </div>
+        <div class="wheel-tag">RR</div>
       </div>
 
       <div class="actions">
@@ -99,13 +104,14 @@
   <main id="view-result" class="view">
     <section class="card">
       <h2 class="card-title">結果</h2>
-      <div id="result-body" class="result-body"></div>
+      <div id="result-txt" class="result-txt mono"></div>
       <div class="actions">
-        <button id="btn-back" class="btn btn-secondary">戻る</button>
+        <button id="btn-back" class="btn btn-secondary">入力に戻る</button>
       </div>
     </section>
   </main>
 </div>
 
-<script defer="True" src="app.js"></script></body>
+<script src="app.js" defer></script>
+</body>
 </html>

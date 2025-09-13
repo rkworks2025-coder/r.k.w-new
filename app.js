@@ -1,153 +1,107 @@
-// Web App URL (unchanged)
-const WEB_APP_URL = 'https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec'; // 既存のまま
+const WEB_APP_URL = 'https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec'; // 既存に合わせて差し替え可
 
-// Utils
-const qs  = (sel, el=document) => el.querySelector(sel);
-const qsa = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+const qs=(s,e=document)=>e.querySelector(s);
+const qsa=(s,e=document)=>Array.from(e.querySelectorAll(s));
+const wheels=["RF","LF","LR","RR"];
 
-const wheelsOrder = ["RF","LF","LR","RR"]; // 入力順 → 結果表示順
+function nowText(){
+  const d=new Date();
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  const hh=String(d.getHours()).padStart(2,'0');
+  const m =String(d.getMinutes()).padStart(2,'0');
+  return `${mm}/${dd} ${hh}:${m}`;
+}
+function setClock(){ qs('#now').textContent = nowText(); }
 
-// 小数点自動（5.5は 55 入力でOK）
-function normalizeDepthInput(v){
-  if (v === "" || v == null) return "";
-  let s = String(v).trim();
-  if (/^\d{2,3}$/.test(s)) {
-    // 55 → 5.5,  605 → 60.5
-    if (s.length === 2) return `${s[0]}.${s[1]}`;
+function toDepth(s){
+  s = String(s||'').trim();
+  if(!s) return '';
+  if(/^\d{2,3}$/.test(s)){
+    if(s.length===2) return `${s[0]}.${s[1]}`;
     return `${s.slice(0,-1)}.${s.slice(-1)}`;
   }
-  return s.replace(",", "."); // 万一のカンマ入力
+  return s.replace(',','.');
 }
 
-// 時刻ボタン
-function setTime(btn, key){
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2,"0");
-  const mm = String(now.getMinutes()).padStart(2,"0");
-  btn.textContent = `${key}　${hh}:${mm}`;
-  btn.dataset.time = `${hh}:${mm}`;
+function recordTime(targetId){
+  const d=new Date();
+  const hh=String(d.getHours()).padStart(2,'0');
+  const mm=String(d.getMinutes()).padStart(2,'0');
+  qs(targetId).textContent = `${hh}:${mm}`;
+  qs(targetId).dataset.time = `${hh}:${mm}`;
 }
 
-// 結果描画
-function renderResult(model){
-  const wrap = qs("#result-body");
-  wrap.innerHTML = "";
-
-  const rows = [
-    ["ステーション", model.station],
-    ["車種", model.model],
-    ["車番", model.plate],
-    ["解錠", model.unlock || "--:--"],
-    ["施錠", model.lock || "--:--"],
-  ];
-
-  rows.forEach(([k,v])=>{
-    const row = document.createElement("div");
-    row.className = "result-row";
-    row.innerHTML = `<div class="result-label">${k}</div><div class="result-value">${v||""}</div>`;
-    wrap.appendChild(row);
-  });
-
-  wheelsOrder.forEach(w=>{
-    const wdata = model.wheels[w] || {};
-    const block = document.createElement("div");
-    block.className = "result-row";
-    block.innerHTML = `
-      <div class="result-label">${w}</div>
-      <div class="result-value">残溝 ${wdata.depth??""} mm / 空気圧 ${wdata.pre??""}→${wdata.post??""} kPa / 製造年週 ${wdata.week??""}</div>
-    `;
-    wrap.appendChild(block);
-  });
-}
-
-// 保存（完了→結果表示時のみ）
-async function saveLog(model){
-  try{
-    const payload = {
-      station: model.station,
-      model:   model.model,
-      plate:   model.plate,
-      unlock:  model.unlock,
-      lock:    model.lock,
-      RF: model.wheels.RF,
-      LF: model.wheels.LF,
-      LR: model.wheels.LR,
-      RR: model.wheels.RR,
-      ts: new Date().toISOString()
-    };
-
-    // localStorage（前回表示用）
-    localStorage.setItem("tire:last", JSON.stringify(payload));
-
-    // GASへ送信（必要な場合のみ。URLがダミーなら無視）
-    if (WEB_APP_URL && /https?:\/\//.test(WEB_APP_URL)) {
-      await fetch(WEB_APP_URL, {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
-      });
-    }
-  }catch(e){
-    console.error(e);
-  }
-}
-
-// 前回表示
-function loadLast(){
-  try{
-    const raw = localStorage.getItem("tire:last");
-    return raw ? JSON.parse(raw) : null;
-  }catch(_){ return null; }
-}
-
-// 入力収集
-function collectInput(){
-  const model = {
-    station: qs("#station").value.trim(),
-    model:   qs("#model").value.trim(),
-    plate:   qs("#plate").value.trim(),
-    unlock:  qs("#btn-unlock").dataset.time || "",
-    lock:    qs("#btn-lock").dataset.time || "",
-    wheels: {}
+function collect(){
+  const model={
+    station: qs('#station').value.trim(),
+    car: qs('#model').value.trim(),
+    plate: qs('#plate').value.trim(),
+    stdPre: qs('#std-pre').value.trim(),
+    stdPost: qs('#std-post').value.trim(),
+    unlock: qs('#unlock-time').dataset.time || '',
+    lock: qs('#lock-time').dataset.time || '',
+    ts: nowText(),
+    wheels:{}
   };
-
-  qsa(".wheel-card").forEach(card=>{
-    const w = card.dataset.wheel;
-    const depth = normalizeDepthInput(qs(".input-depth", card).value);
-    const pre   = qs(".input-press-pre",  card).value.trim();
-    const post  = qs(".input-press-post", card).value.trim();
-    const week  = qs(".input-week",       card).value.trim();
-    model.wheels[w] = { depth, pre, post, week };
+  qsa('.wheel-row').forEach(row=>{
+    const w=row.dataset.wheel;
+    model.wheels[w]={
+      depth: toDepth(qs('.input-depth',row).value),
+      press: qs('.input-press',row).value.trim(),
+      week: qs('.input-week',row).value.trim()
+    };
   });
-
   return model;
 }
 
-// 入力アドバンス（RF → LF → LR → RR）
-function setupAutoAdvance(){
-  wheelsOrder.forEach((w, idx)=>{
-    const card = qs(`.wheel-card[data-wheel="${w}"]`);
-    const inputs = [
-      qs(".input-depth", card),
-      qs(".input-press-pre", card),
-      qs(".input-press-post", card),
-      qs(".input-week", card),
-    ];
+function renderResult(m){
+  const lines=[];
+  // 上部2行（元安定版に近い順）
+  if(m.plate) lines.push(m.plate);
+  if(m.car)   lines.push(m.car);
+  if(m.unlock) lines.push(`解錠　 ${m.unlock}`);
+  else lines.push(`解錠　 --:--`);
+  if(m.lock) lines.push(`施錠　 ${m.lock}`);
+  else lines.push(`施錠　 --:--`);
 
-    inputs.forEach((el, i)=>{
-      el.addEventListener("keydown", (ev)=>{
-        if (ev.key === "Enter"){
+  // タイヤ行
+  wheels.forEach(w=>{
+    const d=m.wheels[w]||{};
+    const a=[d.depth||'', d.press||'', d.week||'', w].join(' ');
+    lines.push(a);
+  });
+
+  // フッター時刻
+  lines.push('');
+  lines.push(m.ts);
+
+  qs('#result-txt').textContent = lines.join('\n');
+}
+
+async function save(m){
+  try{
+    localStorage.setItem('tire:last', JSON.stringify(m));
+    if (WEB_APP_URL && /https?:\/\//.test(WEB_APP_URL)){
+      await fetch(WEB_APP_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(m)});
+    }
+  }catch(e){ console.error(e); }
+}
+
+function setupAdvance(){
+  // Enterで次へ（RF→LF→LR→RR）
+  wheels.forEach((w, idx)=>{
+    const row = qs(`.wheel-row[data-wheel="${w}"]`);
+    const inputs = [qs('.input-depth',row), qs('.input-press',row), qs('.input-week',row)];
+    inputs.forEach((el,i)=>{
+      el.addEventListener('keydown', ev=>{
+        if(ev.key==='Enter'){
           ev.preventDefault();
-          if (i < inputs.length-1){
-            inputs[i+1].focus();
-          }else{
-            // 次の車輪へ
-            const nextW = wheelsOrder[idx+1];
-            if (nextW){
-              qs(`.wheel-card[data-wheel="${nextW}"] .input-depth`).focus();
-            }else{
-              qs("#btn-submit").focus();
-            }
+          if(i<inputs.length-1) inputs[i+1].focus();
+          else{
+            const next = wheels[idx+1];
+            if(next) qs(`.wheel-row[data-wheel="${next}"] .input-depth`).focus();
+            else qs('#btn-submit').focus();
           }
         }
       });
@@ -155,48 +109,28 @@ function setupAutoAdvance(){
   });
 }
 
-// ビュー切り替え
 function show(id){
-  qsa(".view").forEach(v=>v.classList.remove("active"));
-  qs(id).classList.add("active");
-  window.scrollTo({top:0,behavior:"smooth"});
+  qsa('.view').forEach(v=>v.classList.remove('active'));
+  qs(id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
-// 初期化
 function init(){
-  // 時刻ボタン
-  qs("#btn-unlock").addEventListener("click", ()=> setTime(qs("#btn-unlock"), "解錠"));
-  qs("#btn-lock").addEventListener("click",   ()=> setTime(qs("#btn-lock"),   "施錠"));
+  setClock(); setInterval(setClock, 15*1000);
 
-  // 送信
-  qs("#btn-submit").addEventListener("click", async ()=>{
-    const ok = window.confirm("よろしいですか？");
-    if (!ok) return;
+  qs('#btn-unlock').addEventListener('click', ()=>recordTime('#unlock-time'));
+  qs('#btn-lock').addEventListener('click', ()=>recordTime('#lock-time'));
 
-    const model = collectInput();
-    renderResult(model);
-    await saveLog(model);
-
-    show("#view-result");
+  qs('#btn-submit').addEventListener('click', async ()=>{
+    if(!confirm('よろしいですか？')) return;
+    const m = collect();
+    renderResult(m);
+    await save(m);
+    show('#view-result');
   });
 
-  // 戻る
-  qs("#btn-back").addEventListener("click", ()=>{
-    show("#view-input");
-  });
+  qs('#btn-back').addEventListener('click', ()=> show('#view-input'));
 
-  // 前回表示（任意で使う場合は結果ビューへ切替）
-  const last = loadLast();
-  if (last){
-    // 例: コンソールに出しておく
-    console.debug("last:", last);
-  }
-
-  // 入力アドバンス
-  setupAutoAdvance();
-
-  // 初期ビュー
-  show("#view-input");
+  setupAdvance();
 }
-
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener('DOMContentLoaded', init);

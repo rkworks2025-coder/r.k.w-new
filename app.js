@@ -1,4 +1,120 @@
 
+// ---- v3r: draft autosave (plate+station keyed), no UI changes ----
+(function(){
+  const NS = 'draft:v1';
+  const DRAFT_TTL_MS = 24*60*60*1000;
+  let draftTimer = null;
+
+  function toNarrow(s){
+    if(!s) return '';
+    return s.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/　/g,' ');
+  }
+  function normPlate(s){
+    const t = toNarrow(s||'').trim().toLowerCase();
+    return t.replace(/\s+/g,'').replace(/[－–ー―]/g,'-');
+  }
+  function normStation(s){
+    return (s||'').trim();
+  }
+  function getForm(){
+    return document.querySelector('#form');
+  }
+  function getPlate(){ return document.querySelector('[name="plate_full"]')?.value || ''; }
+  function getStation(){ return document.querySelector('[name="station"]')?.value || ''; }
+  function getKey(){
+    const p = normPlate(getPlate());
+    if(!p) return null; // plate未入力のときは保存しない（誤復元防止）
+    const s = normStation(getStation()) || '-';
+    return `${NS}:${p}:${s}`;
+  }
+
+  function collectValues(){
+    const f = getForm(); if(!f) return null;
+    const values = {};
+    f.querySelectorAll('input').forEach(el=>{
+      const k = el.name || el.id;
+      if(!k) return;
+      values[k] = el.value || '';
+    });
+    // 時刻スタンプ（buttonで記録されるやつ）も保持
+    const unlock = document.querySelector('#unlockTime')?.textContent || '';
+    const lock   = document.querySelector('#lockTime')?.textContent || '';
+    return {values, unlock, lock, plate:getPlate(), station:getStation(), ts: Date.now()};
+  }
+
+  function applyValues(d){
+    try{
+      const f = getForm(); if(!f || !d) return;
+      Object.entries(d.values||{}).forEach(([k,v])=>{
+        const el = f.querySelector(`[name="${k}"]`) || document.getElementById(k);
+        if(el && typeof v==='string') el.value = v;
+      });
+      if(d.unlock) { const el = document.querySelector('#unlockTime'); if(el) el.textContent = d.unlock; }
+      if(d.lock)   { const el = document.querySelector('#lockTime');   if(el) el.textContent = d.lock; }
+    }catch(_){}
+  }
+
+  function saveDraftNow(){
+    try{
+      const key = getKey(); if(!key) return;
+      const data = collectValues(); if(!data) return;
+      localStorage.setItem(key, JSON.stringify(data));
+    }catch(_){}
+  }
+  function saveDraftDebounced(){
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraftNow, 600);
+  }
+  function tryLoadDraft(){
+    try{
+      const key = getKey(); if(!key) return;
+      const raw = localStorage.getItem(key);
+      if(!raw) return;
+      const d = JSON.parse(raw);
+      // TTL gate
+      if(!d.ts || (Date.now()-d.ts) > DRAFT_TTL_MS) return;
+      // 厳密一致（誤復元防止）
+      if (normPlate(d.plate) !== normPlate(getPlate())) return;
+      if ((normStation(d.station)||'-') !== (normStation(getStation())||'-')) return;
+      applyValues(d);
+    }catch(_){}
+  }
+  
+  // 監視: #unlockTime / #lockTime のテキスト変化で即保存（input以外の更新に対応）
+  function observeTimes(){
+    try{
+      const targets = [document.querySelector('#unlockTime'), document.querySelector('#lockTime')].filter(Boolean);
+      if(targets.length === 0) return;
+      const obs = new MutationObserver(()=> { try{ saveDraftNow(); }catch(_){ } });
+      targets.forEach(t => obs.observe(t, { characterData:true, childList:true, subtree:true }));
+    }catch(_){}
+  }
+
+  // 起動時と plate/station 確定時に復元
+  document.addEventListener('DOMContentLoaded', ()=>{
+    observeTimes();
+    const f = getForm(); if(!f) return;
+    tryLoadDraft();
+    f.addEventListener('input', saveDraftDebounced);
+    const plateEl = f.querySelector('[name="plate_full"]');
+    const stationEl = f.querySelector('[name="station"]');
+    plateEl && plateEl.addEventListener('blur', tryLoadDraft);
+    stationEl && stationEl.addEventListener('blur', tryLoadDraft);
+  });
+
+  // 完了時：施錠が入力済み（--:-- 以外）ならドラフト削除、未入力なら保持
+  function clearDraftIfFinalized(){
+    const lockText = document.querySelector('#lockTime')?.textContent || '';
+    const isFinal = /\d{1,2}:\d{2}/.test(lockText);
+    if(!isFinal) return;
+    try{ const key = getKey(); if(key) localStorage.removeItem(key); }catch(_){}
+  }
+  // expose clear function for submit flow to call after render
+  window.__clearDraftIfFinalized = clearDraftIfFinalized;
+  window.__saveDraftNow = saveDraftNow; // optional manual flush
+})();
+
+
 // Web App URL (unchanged)
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Lgz61Wc_M5ajTrKtUmR0xnm2BvRyx4b7XYVuTfM92sbaW3RSMwIyVCVEgWzi2mJp/exec';
 

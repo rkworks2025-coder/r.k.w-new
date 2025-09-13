@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>タイヤ点検アプリ v1</title>
+  <title>タイヤ点検アプリ v2</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
-    <h1>タイヤ点検アプリ <span id="version">v1</span></h1>
+    <h1>タイヤ点検アプリ <span id="version">v2</span></h1>
+    <div id="station-info"></div>
     <div id="car-info"></div>
   </header>
 
@@ -32,18 +33,4 @@
       </div>
       <div class="group">
         <label>右後 残溝(mm)</label><input type="text" id="tread_rr">
-        <label>右後 空気圧(kPa)</label><input type="text" id="press_rr">
-        <label>右後 製造年週</label><input type="text" id="ww_rr">
-      </div>
-      <button id="save-btn">保存</button>
-    </section>
-
-    <section id="result-section">
-      <h2>結果</h2>
-      <pre id="result"></pre>
-    </section>
-  </main>
-
-  <script src="app.js"></script>
-</body>
-</html>
+        <label>

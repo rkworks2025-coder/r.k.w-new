@@ -1,3 +1,4 @@
+/* 黒基調＋オレンジアクセント。左寄せ・視認性重視（現場スクショ前提） */
 body {
   background: #000;
   color: #fff;
@@ -22,12 +23,12 @@ header h1 {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: #f97316;
+  color: #f97316; /* オレンジ */
 }
 
 #station-info {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 #car-info {
@@ -35,36 +36,99 @@ header h1 {
   color: #aaa;
 }
 
+main {
+  padding: 10px;
+}
+
+/* 2画面切替 */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* 入力画面 */
 .group {
   margin: 10px 0;
   display: grid;
   grid-template-columns: 150px 1fr;
-  gap: 5px;
+  gap: 6px 8px;
+}
+
+.group label {
+  line-height: 36px;
 }
 
 input {
-  padding: 6px;
-  border-radius: 5px;
+  padding: 6px 8px;
+  height: 36px;
+  border-radius: 6px;
   border: 1px solid #333;
   background: #222;
   color: #fff;
+  font-size: 16px;
 }
 
 button {
-  margin-top: 10px;
-  padding: 10px 20px;
+  margin-top: 12px;
+  padding: 12px 18px;
   background: #f97316;
+  color: #000;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-#result-section {
-  margin-top: 20px;
-  padding: 10px;
-  background: #171a21;
+/* 結果画面（左寄せ・大きめ・スクショ想定） */
+#result-screen {
+  padding-top: 6px;
+}
+
+#result-header {
+  margin-bottom: 6px;
+}
+
+.result-station {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.result-car {
+  font-size: 16px;
+  color: #ccc;
+  margin-top: 2px;
+}
+
+.result-savedat {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* 結果の本文：大きめ、左寄せ、行間取り */
+.result-body {
+  background: #151515;
+  border: 1px solid #333;
   border-radius: 8px;
-  white-space: pre-wrap;
-  font-size: 18px; /* 結果表示を大きめに */
+  padding: 10px;
+  font-size: 20px;        /* 小さく表示されても読めるように大きめ */
+  line-height: 1.5;       /* 行間 */
+  letter-spacing: 0.2px;  /* 読みやすいよう微調整 */
+  text-align: left;
+}
+
+/* セクション見出し */
+.result-body .sec-title {
+  margin: 10px 0 6px;
+  color: #f97316;
+  font-weight: 800;
+  font-size: 20px;
+}
+
+/* ラベルと値（縦並び・左寄せ） */
+.result-row {
+  margin: 2px 0;
+}
+
+.result-actions {
+  margin-top: 14px;
 }

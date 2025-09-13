@@ -1,47 +1,67 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>タイヤ点検アプリ v3a</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>タイヤ点検アプリ v3b</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
   <header>
-    <h1>タイヤ点検アプリ <span id="version">v3a</span></h1>
+    <h1>タイヤ点検アプリ <span id="version">v3b</span></h1>
+    <!-- 最上段にステーション名 -->
     <div id="station-info"></div>
     <div id="car-info"></div>
   </header>
 
   <main>
-    <section id="form-section">
+    <!-- 入力画面 -->
+    <section id="input-screen" class="screen active">
       <h2>点検入力</h2>
+
+      <!-- 入力順：右前→左前→左後→右後 ／ 各タイヤ：残溝→空気圧→製造年週 -->
       <div class="group">
-        <label>右前 残溝(mm)</label><input type="text" id="tread_rf">
-        <label>右前 空気圧(kPa)</label><input type="text" id="press_rf">
-        <label>右前 製造年週</label><input type="text" id="ww_rf">
+        <label>右前 残溝(mm)</label><input type="text" id="tread_rf" inputmode="decimal">
+        <label>右前 空気圧(kPa)</label><input type="text" id="press_rf" inputmode="decimal">
+        <label>右前 製造年週</label><input type="text" id="ww_rf" inputmode="numeric" placeholder="例: 2423">
       </div>
+
       <div class="group">
-        <label>左前 残溝(mm)</label><input type="text" id="tread_lf">
-        <label>左前 空気圧(kPa)</label><input type="text" id="press_lf">
-        <label>左前 製造年週</label><input type="text" id="ww_lf">
+        <label>左前 残溝(mm)</label><input type="text" id="tread_lf" inputmode="decimal">
+        <label>左前 空気圧(kPa)</label><input type="text" id="press_lf" inputmode="decimal">
+        <label>左前 製造年週</label><input type="text" id="ww_lf" inputmode="numeric" placeholder="例: 2423">
       </div>
+
       <div class="group">
-        <label>左後 残溝(mm)</label><input type="text" id="tread_lr">
-        <label>左後 空気圧(kPa)</label><input type="text" id="press_lr">
-        <label>左後 製造年週</label><input type="text" id="ww_lr">
+        <label>左後 残溝(mm)</label><input type="text" id="tread_lr" inputmode="decimal">
+        <label>左後 空気圧(kPa)</label><input type="text" id="press_lr" inputmode="decimal">
+        <label>左後 製造年週</label><input type="text" id="ww_lr" inputmode="numeric" placeholder="例: 2423">
       </div>
+
       <div class="group">
-        <label>右後 残溝(mm)</label><input type="text" id="tread_rr">
-        <label>右後 空気圧(kPa)</label><input type="text" id="press_rr">
-        <label>右後 製造年週</label><input type="text" id="ww_rr">
+        <label>右後 残溝(mm)</label><input type="text" id="tread_rr" inputmode="decimal">
+        <label>右後 空気圧(kPa)</label><input type="text" id="press_rr" inputmode="decimal">
+        <label>右後 製造年週</label><input type="text" id="ww_rr" inputmode="numeric" placeholder="例: 2423">
       </div>
-      <button id="save-btn">完了 → 結果表示</button>
+
+      <button id="complete-btn">完了 → 結果表示</button>
     </section>
 
-    <section id="result-section">
-      <h2>結果</h2>
-      <pre id="result"></pre>
+    <!-- 結果画面（左寄せ・大きめ・スクショしやすい） -->
+    <section id="result-screen" class="screen">
+      <div id="result-header">
+        <div id="result-station" class="result-station"></div>
+        <div id="result-car" class="result-car"></div>
+        <div id="result-savedat" class="result-savedat"></div>
+      </div>
+
+      <div id="result-body" class="result-body">
+        <!-- JSで整形テキストを差し込み -->
+      </div>
+
+      <div class="result-actions">
+        <button id="back-btn">戻る（入力に戻る）</button>
+      </div>
     </section>
   </main>
 

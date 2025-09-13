@@ -1,4 +1,19 @@
 
+// v3h1: 初期表示でバナー更新 & 駅名入力変更で追従
+function setupStationBannerLive(){
+  try{
+    const stEl = document.querySelector('#station');
+    // 初回（URL param > input値）
+    updateStationTopBanner((APP_CTX.paramStation && APP_CTX.paramStation.trim()) ? APP_CTX.paramStation : (stEl?.value||''));
+    if(stEl){
+      stEl.addEventListener('blur', ()=> updateStationTopBanner(stEl.value));
+      stEl.addEventListener('change', ()=> updateStationTopBanner(stEl.value));
+      stEl.addEventListener('input', ()=> updateStationTopBanner(stEl.value));
+    }
+  }catch(_){}
+}
+
+
 // ---- v3h: URLパラメータ（station/plate/model）受け取り & 結果画面上部に表示 ----
 let APP_CTX = { paramStation:null, paramPlate:null, paramModel:null };
 

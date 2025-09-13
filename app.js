@@ -1,4 +1,73 @@
 
+// ---- v3h: URLパラメータ（station/plate/model）受け取り & 結果画面上部に表示 ----
+let APP_CTX = { paramStation:null, paramPlate:null, paramModel:null };
+
+function parseQuery(){
+  const q={};
+  const src = (location.search||'').replace(/^\?/,'');
+  if(!src) return q;
+  src.split('&').forEach(p=>{
+    if(!p) return;
+    const [k,v] = p.split('=');
+    const key = decodeURIComponent(k||'').toLowerCase();
+    const val = decodeURIComponent((v||'').replace(/\+/g,' '));
+    q[key]=val;
+  });
+  return q;
+}
+
+function applyParamsToForm(){
+  try{
+    const q = parseQuery();
+    APP_CTX.paramStation = q.station || null;
+    APP_CTX.paramPlate   = q.plate   || null;
+    APP_CTX.paramModel   = q.model   || null;
+
+    const st = document.querySelector('#station');
+    const pl = document.querySelector('#plate');
+    const md = document.querySelector('#model');
+
+    if (APP_CTX.paramStation && st){
+      st.value = APP_CTX.paramStation;
+      st.readOnly = true;
+      st.classList.add('readonly');
+    }
+    if (APP_CTX.paramModel && md && !md.value){
+      md.value = APP_CTX.paramModel;
+    }
+    if (APP_CTX.paramPlate && pl && !pl.value){
+      pl.value = APP_CTX.paramPlate;
+    }
+  }catch(_){}
+}
+
+function guardPlateBeforeSubmit(model){
+  if (APP_CTX.paramPlate){
+    const a = normalizePlateKey(APP_CTX.paramPlate);
+    const b = normalizePlateKey(model.plate);
+    if (a !== b){
+      alert('巡回アプリの車両と一致しません（フルナンバー）。\\n入力内容を確認してください。');
+      return false;
+    }
+  }
+  if (APP_CTX.paramStation && model.station){
+    const s1 = (APP_CTX.paramStation||'').trim();
+    const s2 = (model.station||'').trim();
+    if (s1 !== s2){
+      alert('巡回アプリのステーション名と一致しません。入力内容を確認してください。');
+      return false;
+    }
+  }
+  return true;
+}
+
+function updateStationTopBanner(stationText){
+  const el = document.querySelector('#station-top');
+  if (!el) return;
+  el.textContent = stationText || '';
+}
+
+
 // ---- v3g: 前回値プレースホルダー（plate別） ----
 function loadLastByPlate(){
   try{ return JSON.parse(localStorage.getItem('lastByPlate')||'{}'); }catch(_){ return {}; }

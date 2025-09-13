@@ -73,3 +73,9 @@
 /* --- appended: version badge (fixed, non-intrusive) --- */
 .ver-badge{position:fixed;top:8px;right:12px;padding:2px 6px;font-size:12px;border:1px solid #333;border-radius:999px;color:#bbb;background:rgba(0,0,0,.35);backdrop-filter:saturate(120%) blur(2px);z-index:9999}
 
+
+
+/* result top station name */
+.station-top{ margin:8px 4px 6px; font-size:18px; font-weight:700; color:#fff; }
+
+input.readonly{ opacity:0.85; background:#101010; }

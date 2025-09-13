@@ -1,4 +1,71 @@
 
+// ---- v3f: 車両固有 規定圧メモリ（localStorage） ----
+function normalizePlateKey(s){
+  if(!s) return "";
+  // 全角→半角
+  const toNarrow = s.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+                    .replace(/　/g, ' ');
+  // 記号・空白を統一、小文字化
+  return toNarrow.trim().toLowerCase().replace(/\s+/g,'').replace(/[－–ー―]/g,'-');
+}
+
+function loadPressByPlate(){
+  try{ return JSON.parse(localStorage.getItem('pressByPlate')||'{}'); }catch(_){ return {}; }
+}
+function savePressByPlate(db){
+  try{ localStorage.setItem('pressByPlate', JSON.stringify(db)); }catch(_){}
+}
+
+function getPlatePressure(plateInput){
+  const key = normalizePlateKey(plateInput);
+  if(!key) return null;
+  const db = loadPressByPlate();
+  return db[key] || null; // {front, rear, updatedAt}
+}
+
+function rememberPlatePressure(model){
+  // model: collect() の戻り値
+  const plateKey = normalizePlateKey(model.plate);
+  if(!plateKey) return;
+  const pre  = parseInt((model.stdPre||qs('#std-pre')?.value||'').trim(), 10);
+  const post = parseInt((model.stdPost||qs('#std-post')?.value||'').trim(), 10);
+  if (Number.isFinite(pre) && Number.isFinite(post)){
+    const db = loadPressByPlate();
+    db[plateKey] = { front: pre, rear: post, updatedAt: new Date().toISOString() };
+    savePressByPlate(db);
+  }
+}
+
+function applyPlatePressure(){
+  const plateEl = document.querySelector('#plate');
+  const preEl   = document.querySelector('#std-pre');
+  const postEl  = document.querySelector('#std-post');
+  if(!plateEl || !preEl || !postEl) return;
+
+  const rec = getPlatePressure(plateEl.value);
+  if (rec){
+    // plate固有が見つかったら、空欄に限らず“その値で”反映（現場の正値優先）
+    preEl.value  = rec.front;
+    postEl.value = rec.rear;
+  }else{
+    // plate固有が無いなら、v3eのモデルマスタ（空欄のときだけ上書き）に委譲
+    try{
+      const res = getPressure(document.querySelector('#model').value);
+      if (res.front != null && preEl.value.trim() === '') preEl.value = res.front;
+      if (res.rear  != null && postEl.value.trim() === '') postEl.value = res.rear;
+    }catch(_){}
+  }
+}
+
+function setupPlateAutofill(){
+  const plateEl = document.querySelector('#plate');
+  if(!plateEl) return;
+  const handler = ()=> applyPlatePressure();
+  plateEl.addEventListener('blur', handler);
+  plateEl.addEventListener('change', handler);
+}
+
+
 // ---- v3e: 内蔵 規定圧マスタ（編集可） ----
 const PRESSURE_MASTER = {
   "c-hr":    { front:240, rear:240 },

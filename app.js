@@ -135,9 +135,9 @@ if (form) form.addEventListener('submit', async (ev)=>{
   resHeader.textContent = (p.station ? `${p.station}
 ` : '') + `${p.plate_full}
 ${p.model}`;
-  resTimes.innerHTML = '';
+  resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
   let out = lines;
-out = out.replace(/^\s*(解錠[^\n]*\n施錠[^\n]*\n)\s*\1/, '$1');
+out = out.replace(/^(解錠[^\n]*\n施錠[^\n]*\n)\1/, '$1');
 resLines.textContent = out;
 
   form.style.display = 'none';

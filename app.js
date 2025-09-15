@@ -1,165 +1,92 @@
+// v3v: Google Sheets (GAS) logging — minimal, no UI changes
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec';   // ★ ここにGASウェブアプリURL
+const SHEETS_KEY = '';   // ★ ここにAPI_KEY（GAS側と一致）
+async function pushToSheet(p){
+  try{
+    if(!SHEETS_URL) return;
+    const body = new URLSearchParams();
+    if (SHEETS_KEY) body.set('key', SHEETS_KEY);
+    body.set('json', JSON.stringify(p));
+    await fetch(SHEETS_URL, { method:'POST', body });
+  }catch(_){}
+}
 
-// ---- v3r: draft autosave (plate+station keyed), no UI changes ----
-// v3t: reload-aware restore + pagehide flush + lastKey in sessionStorage
+
+// ---- draft:v1 (plate+station keyed) + reload-aware (session lastKey) ----
 (function(){
   const NS = 'draft:v1';
   const DRAFT_TTL_MS = 24*60*60*1000;
   let draftTimer = null;
 
-  function toNarrow(s){
-    if(!s) return '';
-    return s.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/　/g,' ');
-  }
-  function normPlate(s){
-    const t = toNarrow(s||'').trim().toLowerCase();
-    return t.replace(/\s+/g,'').replace(/[－–ー―]/g,'-');
-  }
-  function normStation(s){
-    return (s||'').trim();
-  }
-  function getForm(){
-    return document.querySelector('#form');
-  }
-  function getPlate(){ return document.querySelector('[name="plate_full"]')?.value || ''; }
-  function getStation(){ return document.querySelector('[name="station"]')?.value || ''; }
-  function getKey(){
-    const p = normPlate(getPlate());
-    if(!p) return null; // plate未入力のときは保存しない（誤復元防止）
-    const s = normStation(getStation()) || '-';
-    return `${NS}:${p}:${s}`;
-  }
+  function toNarrow(s){ return (s||'').replace(/[！-～]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/　/g,' '); }
+  function normPlate(s){ const t = toNarrow(s).trim().toLowerCase(); return t.replace(/\s+/g,'').replace(/[－–ー―]/g,'-'); }
+  function normStation(s){ return (s||'').trim(); }
+  function form(){ return document.querySelector('#form'); }
+  function get(name){ const f=form(); return f && (f.querySelector(`[name="${name}"]`)||document.getElementById(name)); }
+  function getPlate(){ return get('plate_full')?.value || ''; }
+  function getStation(){ return get('station')?.value || ''; }
+  function key(){ const p=normPlate(getPlate()); if(!p) return null; const s=normStation(getStation())||'-'; return `${NS}:${p}:${s}`; }
 
-  function collectValues(){
-    const f = getForm(); if(!f) return null;
-    const values = {};
-    f.querySelectorAll('input').forEach(el=>{
-      const k = el.name || el.id;
-      if(!k) return;
-      values[k] = el.value || '';
-    });
-    // 時刻スタンプ（buttonで記録されるやつ）も保持
+  function collect(){
+    const f=form(); if(!f) return null;
+    const values={};
+    f.querySelectorAll('input').forEach(el=>{ const k=el.name||el.id; if(k) values[k]=el.value||''; });
     const unlock = document.querySelector('#unlockTime')?.textContent || '';
     const lock   = document.querySelector('#lockTime')?.textContent || '';
-    return {values, unlock, lock, plate:getPlate(), station:getStation(), ts: Date.now()};
+    return {values, unlock, lock, plate:getPlate(), station:getStation(), ts:Date.now()};
   }
-
-  function applyValues(d){
+  function apply(d){
     try{
-      const f = getForm(); if(!f || !d) return;
-      Object.entries(d.values||{}).forEach(([k,v])=>{
-        const el = f.querySelector(`[name="${k}"]`) || document.getElementById(k);
-        if(el && typeof v==='string') el.value = v;
-      });
-      if(d.unlock) { const el = document.querySelector('#unlockTime'); if(el) el.textContent = d.unlock; }
-      if(d.lock)   { const el = document.querySelector('#lockTime');   if(el) el.textContent = d.lock; }
+      const f=form(); if(!f||!d) return;
+      Object.entries(d.values||{}).forEach(([k,v])=>{ const el=f.querySelector(`[name="${k}"]`)||document.getElementById(k); if(el) el.value = typeof v==='string'?v:''; });
+      if(d.unlock){ const el=document.querySelector('#unlockTime'); if(el) el.textContent=d.unlock; }
+      if(d.lock){   const el=document.querySelector('#lockTime');   if(el) el.textContent=d.lock; }
     }catch(_){}
   }
-
-  function saveDraftNow(){
-    try{
-      const key = getKey(); if(!key) return;
-      const data = collectValues(); if(!data) return;
-      localStorage.setItem(key, JSON.stringify(data));
-      lastKeyStore(key);
-    }catch(_){}
+  function saveNow(){
+    try{ const k=key(); if(!k) return; const d=collect(); if(!d) return; localStorage.setItem(k, JSON.stringify(d)); lastKey(k); }catch(_){}
   }
-  function saveDraftDebounced(){
-    clearTimeout(draftTimer);
-    draftTimer = setTimeout(saveDraftNow, 600);
+  function saveDeb(){ clearTimeout(draftTimer); draftTimer=setTimeout(saveNow, 600); }
+  function tryLoad(){
+    try{
+      const k=key(); if(k){ const raw=localStorage.getItem(k); if(raw){ const d=JSON.parse(raw); if(d.ts && (Date.now()-d.ts)<=DRAFT_TTL_MS){
+        if(normPlate(d.plate)===normPlate(getPlate()) && (normStation(d.station)||'-')===(normStation(getStation())||'-')) apply(d);
+      } } }
+    }catch(_){}
   }
   function isReload(){
-      try{
-        const navs = performance.getEntriesByType && performance.getEntriesByType('navigation');
-        if(navs && navs.length && navs[0].type) return navs[0].type === 'reload';
-      }catch(_){}
-      try{
-        if (performance && performance.navigation) return performance.navigation.type === 1; // deprecated fallback
-      }catch(_){}
-      return false;
-    }
-
-    function lastKeyStore(setKey){
-      try{
-        const K='draft:lastKey';
-        if (setKey===undefined) return sessionStorage.getItem(K);
-        if (setKey===null) sessionStorage.removeItem(K);
-        else sessionStorage.setItem(K, setKey);
-      }catch(_){}
-      return null;
-    }
-
-    function tryLoadDraft(){
-    try{
-      const key = getKey(); if(!key) return;
-      const raw = localStorage.getItem(key);
-      if(!raw) return;
-      const d = JSON.parse(raw);
-      // TTL gate
-      if(!d.ts || (Date.now()-d.ts) > DRAFT_TTL_MS) return;
-      // 厳密一致（誤復元防止）
-      if (normPlate(d.plate) !== normPlate(getPlate())) return;
-      if ((normStation(d.station)||'-') !== (normStation(getStation())||'-')) return;
-      applyValues(d);
-    }catch(_){}
+    try{ const navs=performance.getEntriesByType&&performance.getEntriesByType('navigation'); if(navs&&navs.length&&navs[0].type) return navs[0].type==='reload'; }catch(_){}
+    try{ if(performance&&performance.navigation) return performance.navigation.type===1; }catch(_){}
+    return false;
   }
-  
-  // 監視: #unlockTime / #lockTime のテキスト変化で即保存（input以外の更新に対応）
+  function lastKey(val){
+    try{
+      const K='draft:lastKey';
+      if(val===undefined) return sessionStorage.getItem(K);
+      if(val===null) sessionStorage.removeItem(K);
+      else sessionStorage.setItem(K, val);
+    }catch(_){}
+    return null;
+  }
   function observeTimes(){
     try{
-      const targets = [document.querySelector('#unlockTime'), document.querySelector('#lockTime')].filter(Boolean);
-      if(targets.length === 0) return;
-      const obs = new MutationObserver(()=> { try{ saveDraftNow(); }catch(_){ } });
-      targets.forEach(t => obs.observe(t, { characterData:true, childList:true, subtree:true }));
+      const t=[document.querySelector('#unlockTime'), document.querySelector('#lockTime')].filter(Boolean);
+      if(!t.length) return;
+      const obs=new MutationObserver(()=>{ try{ saveNow(); }catch(_){ } });
+      t.forEach(n=>obs.observe(n,{characterData:true,childList:true,subtree:true}));
     }catch(_){}
   }
 
-  // 起動時と plate/station 確定時に復元
   document.addEventListener('DOMContentLoaded', ()=>{
-    // On hard reload in same tab, restore last active draft safely
-    try{
-      if(isReload()){
-        const lk = lastKeyStore();
-        if(lk){
-          const raw = localStorage.getItem(lk);
-          if(raw){
-            const d = JSON.parse(raw);
-            // TTL check (if present in code)
-            try{
-              if(typeof DRAFT_TTL_MS !== 'undefined'){
-                if(!d.ts || (Date.now()-d.ts) > DRAFT_TTL_MS) throw new Error('ttl');
-              }
-            }catch(_){}
-            applyValues(d);
-          }
-        }
-      }
-    }catch(_){}
-
-
+    const f=form(); if(!f) return;
+    // reload時は直前キーから復元（同一タブ限定）
+    try{ if(isReload()){ const lk=lastKey(); if(lk){ const raw=localStorage.getItem(lk); if(raw){ const d=JSON.parse(raw); if(d.ts && (Date.now()-d.ts)<=DRAFT_TTL_MS) apply(d); } } } }catch(_){}
+    tryLoad();
+    f.addEventListener('input', saveDeb);
+    try{ window.addEventListener('pagehide', ()=>{ try{ saveNow(); }catch(_){ } }); }catch(_){}
+    try{ document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ try{ saveNow(); }catch(_){ } } }); }catch(_){}
     observeTimes();
-    const f = getForm(); if(!f) return;
-    tryLoadDraft();
-    f.addEventListener('input', saveDraftDebounced);
-    // Flush on pagehide/visibilitychange to catch quick reload/close
-    try{ window.addEventListener('pagehide', ()=>{ try{ saveDraftNow(); }catch(_){ } }); }catch(_){}
-    try{ document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ try{ saveDraftNow(); }catch(_){ } } }); }catch(_){}
-
-    const plateEl = f.querySelector('[name="plate_full"]');
-    const stationEl = f.querySelector('[name="station"]');
-    plateEl && plateEl.addEventListener('blur', tryLoadDraft);
-    stationEl && stationEl.addEventListener('blur', tryLoadDraft);
   });
-
-  // 完了時：施錠が入力済み（--:-- 以外）ならドラフト削除、未入力なら保持
-  function clearDraftIfFinalized(){
-    const lockText = document.querySelector('#lockTime')?.textContent || '';
-    const isFinal = /\d{1,2}:\d{2}/.test(lockText);
-    if(!isFinal) return;
-    try{ const key = getKey(); if(key) localStorage.removeItem(key); }catch(_){}
-  }
-  // expose clear function for submit flow to call after render
-  window.__clearDraftIfFinalized = clearDraftIfFinalized;
-  window.__saveDraftNow = saveDraftNow; // optional manual flush
 })();
 
 

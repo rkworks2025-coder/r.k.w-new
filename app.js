@@ -1,6 +1,6 @@
 // v3v: Google Sheets (GAS) logging — minimal, no UI changes
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec';   // ★ ここにGASウェブアプリURL
-const SHEETS_KEY = '';   // ★ ここにAPI_KEY（GAS側と一致）
+const SHEETS_KEY = 'tl1';   // ★ ここにAPI_KEY（GAS側と一致）
 async function pushToSheet(p){
   try{
     if(!SHEETS_URL) return;

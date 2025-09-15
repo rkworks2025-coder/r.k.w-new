@@ -131,7 +131,9 @@ if (form) form.addEventListener('submit', async (ev)=>{
   // 結果画面更新（stationも先頭に）
   resHeader.textContent = (p.station? (p.station+'\n') : '') + p.plate_full + '\n' + p.model;
   resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
-  resLines.textContent = lines;
+  let out = lines;
+out = out.replace(/^(解錠[^\n]*\n施錠[^\n]*\n)\1/, '$1');
+resLines.textContent = out;
 
   form.style.display = 'none';
   resultCard.style.display = 'block';

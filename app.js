@@ -1,97 +1,7 @@
-// v3v: Google Sheets (GAS) logging — minimal, no UI changes
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec';   // ★ ここにGASウェブアプリURL
-const SHEETS_KEY = 'tl1';   // ★ ここにAPI_KEY（GAS側と一致）
-async function pushToSheet(p){
-  try{
-    if(!SHEETS_URL) return;
-    const body = new URLSearchParams();
-    if (SHEETS_KEY) body.set('key', SHEETS_KEY);
-    body.set('json', JSON.stringify(p));
-    await fetch(SHEETS_URL, { method:'POST', body });
-  }catch(_){}
-}
-
-
-// ---- draft:v1 (plate+station keyed) + reload-aware (session lastKey) ----
-(function(){
-  const NS = 'draft:v1';
-  const DRAFT_TTL_MS = 24*60*60*1000;
-  let draftTimer = null;
-
-  function toNarrow(s){ return (s||'').replace(/[！-～]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/　/g,' '); }
-  function normPlate(s){ const t = toNarrow(s).trim().toLowerCase(); return t.replace(/\s+/g,'').replace(/[－–ー―]/g,'-'); }
-  function normStation(s){ return (s||'').trim(); }
-  function form(){ return document.querySelector('#form'); }
-  function get(name){ const f=form(); return f && (f.querySelector(`[name="${name}"]`)||document.getElementById(name)); }
-  function getPlate(){ return get('plate_full')?.value || ''; }
-  function getStation(){ return get('station')?.value || ''; }
-  function key(){ const p=normPlate(getPlate()); if(!p) return null; const s=normStation(getStation())||'-'; return `${NS}:${p}:${s}`; }
-
-  function collect(){
-    const f=form(); if(!f) return null;
-    const values={};
-    f.querySelectorAll('input').forEach(el=>{ const k=el.name||el.id; if(k) values[k]=el.value||''; });
-    const unlock = document.querySelector('#unlockTime')?.textContent || '';
-    const lock   = document.querySelector('#lockTime')?.textContent || '';
-    return {values, unlock, lock, plate:getPlate(), station:getStation(), ts:Date.now()};
-  }
-  function apply(d){
-    try{
-      const f=form(); if(!f||!d) return;
-      Object.entries(d.values||{}).forEach(([k,v])=>{ const el=f.querySelector(`[name="${k}"]`)||document.getElementById(k); if(el) el.value = typeof v==='string'?v:''; });
-      if(d.unlock){ const el=document.querySelector('#unlockTime'); if(el) el.textContent=d.unlock; }
-      if(d.lock){   const el=document.querySelector('#lockTime');   if(el) el.textContent=d.lock; }
-    }catch(_){}
-  }
-  function saveNow(){
-    try{ const k=key(); if(!k) return; const d=collect(); if(!d) return; localStorage.setItem(k, JSON.stringify(d)); lastKey(k); }catch(_){}
-  }
-  function saveDeb(){ clearTimeout(draftTimer); draftTimer=setTimeout(saveNow, 600); }
-  function tryLoad(){
-    try{
-      const k=key(); if(k){ const raw=localStorage.getItem(k); if(raw){ const d=JSON.parse(raw); if(d.ts && (Date.now()-d.ts)<=DRAFT_TTL_MS){
-        if(normPlate(d.plate)===normPlate(getPlate()) && (normStation(d.station)||'-')===(normStation(getStation())||'-')) apply(d);
-      } } }
-    }catch(_){}
-  }
-  function isReload(){
-    try{ const navs=performance.getEntriesByType&&performance.getEntriesByType('navigation'); if(navs&&navs.length&&navs[0].type) return navs[0].type==='reload'; }catch(_){}
-    try{ if(performance&&performance.navigation) return performance.navigation.type===1; }catch(_){}
-    return false;
-  }
-  function lastKey(val){
-    try{
-      const K='draft:lastKey';
-      if(val===undefined) return sessionStorage.getItem(K);
-      if(val===null) sessionStorage.removeItem(K);
-      else sessionStorage.setItem(K, val);
-    }catch(_){}
-    return null;
-  }
-  function observeTimes(){
-    try{
-      const t=[document.querySelector('#unlockTime'), document.querySelector('#lockTime')].filter(Boolean);
-      if(!t.length) return;
-      const obs=new MutationObserver(()=>{ try{ saveNow(); }catch(_){ } });
-      t.forEach(n=>obs.observe(n,{characterData:true,childList:true,subtree:true}));
-    }catch(_){}
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const f=form(); if(!f) return;
-    // reload時は直前キーから復元（同一タブ限定）
-    try{ if(isReload()){ const lk=lastKey(); if(lk){ const raw=localStorage.getItem(lk); if(raw){ const d=JSON.parse(raw); if(d.ts && (Date.now()-d.ts)<=DRAFT_TTL_MS) apply(d); } } } }catch(_){}
-    tryLoad();
-    f.addEventListener('input', saveDeb);
-    try{ window.addEventListener('pagehide', ()=>{ try{ saveNow(); }catch(_){ } }); }catch(_){}
-    try{ document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ try{ saveNow(); }catch(_){ } } }); }catch(_){}
-    observeTimes();
-  });
-})();
-
 
 // Web App URL (unchanged)
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Lgz61Wc_M5ajTrKtUmR0xnm2BvRyx4b7XYVuTfM92sbaW3RSMwIyVCVEgWzi2mJp/exec';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec';
+const SHEETS_KEY = 'tl1';
 
 // Set current date/time in JST
 function nowJST(){
@@ -157,8 +67,16 @@ function autoAdvanceDOT(el){
 // Toast notifications
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1400); }
 
-async function postToSheet(payload){
-  fetch(WEB_APP_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) });
+async async function postToSheet(payload){
+  try{
+    if(!SHEETS_URL){ showToast('送信しました'); return; }
+    const body = new URLSearchParams();
+    if (SHEETS_KEY) body.set('key', SHEETS_KEY);
+    body.set('json', JSON.stringify(payload));
+    await fetch(SHEETS_URL, { method:'POST', body });
+  }catch(_){}
+  showToast('送信しました');
+});
   showToast('送信しました');
 }
 
@@ -192,9 +110,7 @@ form.addEventListener('submit', async () => {
     '',
     nowJST()
   ].join('\n');
-  resHeader.textContent = `${p.station}
-${p.plate_full}
-${p.model}`;
+  resHeader.textContent = `${p.plate_full}\n${p.model}`;
   resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
   resLines.textContent  = lines;
   form.style.display='none'; resultCard.style.display='block'; window.scrollTo({top:0,behavior:'smooth'});

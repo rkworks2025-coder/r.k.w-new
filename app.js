@@ -147,3 +147,79 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   form.style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});
 });
+
+// --- autosave module (1 block; station+plate keyed) ---
+(function(){
+  const $ = (s)=>document.querySelector(s);
+  const byName = (n)=>document.querySelector(`[name="${n}"]`);
+  const elStation = byName('station');
+  const elPlate   = byName('plate_full');
+
+  function key(){
+    const s = elStation?.value?.trim();
+    const p = elPlate?.value?.trim();
+    if(!s || !p) return null;
+    return `tireapp:v1:${s}:${p}`;
+  }
+
+  function collect(){
+    const g = id => document.getElementById(id)?.value || '';
+    return {
+      station: byName('station')?.value || '',
+      model: byName('model')?.value || '',
+      plate_full: byName('plate_full')?.value || '',
+      std_f: byName('std_f')?.value || '',
+      std_r: byName('std_r')?.value || '',
+      tread_rf: g('tread_rf'), pre_rf: g('pre_rf'), dot_rf: g('dot_rf'),
+      tread_lf: g('tread_lf'), pre_lf: g('pre_lf'), dot_lf: g('dot_lf'),
+      tread_lr: g('tread_lr'), pre_lr: g('pre_lr'), dot_lr: g('dot_lr'),
+      tread_rr: g('tread_rr'), pre_rr: g('pre_rr'), dot_rr: g('dot_rr'),
+      unlock: document.getElementById('unlockTime')?.textContent || '',
+      lock:   document.getElementById('lockTime')?.textContent || '',
+      ts: Date.now()
+    };
+  }
+
+  function apply(d){
+    if(!d) return;
+    const setName = (n,v)=>{ const el=byName(n); if(el) el.value = v||''; };
+    setName('station', d.station); setName('model', d.model); setName('plate_full', d.plate_full);
+    setName('std_f', d.std_f); setName('std_r', d.std_r);
+    const setId = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+    ['tread_rf','pre_rf','dot_rf','tread_lf','pre_lf','dot_lf','tread_lr','pre_lr','dot_lr','tread_rr','pre_rr','dot_rr']
+      .forEach(k=> setId(k, d[k]));
+    if(d.unlock){ const u=document.getElementById('unlockTime'); if(u) u.textContent=d.unlock; }
+    if(d.lock){   const l=document.getElementById('lockTime');   if(l) l.textContent=d.lock;   }
+  }
+
+  function save(){
+    const k = key(); if(!k) return;
+    try{ localStorage.setItem(k, JSON.stringify(collect())); }catch(e){}
+  }
+
+  function restore(){
+    const k = key(); if(!k) return;
+    try{
+      const s = localStorage.getItem(k); if(!s) return;
+      const d = JSON.parse(s);
+      if(d.ts && (Date.now()-d.ts) > 36*60*60*1000) return; // 36h staleness guard
+      apply(d);
+    }catch(e){}
+  }
+
+  let t=0;
+  function queueSave(){ clearTimeout(t); t=setTimeout(save, 500); }
+
+  Array.from(document.querySelectorAll('input')).forEach(el=> el.addEventListener('input', queueSave));
+
+  document.getElementById('unlockBtn')?.addEventListener('click', ()=> setTimeout(save,0));
+  document.getElementById('lockBtn')?.addEventListener('click', ()=> setTimeout(save,0));
+
+  elStation?.addEventListener('change', restore);
+  elPlate?.addEventListener('change', restore);
+
+  // try at load (URLからの自動入力対応時も拾う)
+  restore();
+})();
+// --- end autosave ---
+

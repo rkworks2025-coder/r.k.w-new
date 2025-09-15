@@ -148,78 +148,113 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
-// --- autosave module (1 block; station+plate keyed) ---
+// --- autosave module (1 block; station+plate keyed, session lastKey for reload) ---
 (function(){
-  const $ = (s)=>document.querySelector(s);
   const byName = (n)=>document.querySelector(`[name="${n}"]`);
   const elStation = byName('station');
   const elPlate   = byName('plate_full');
+  const LAST_KEY  = 'tireapp:lastKey';
 
+  const get = (sel)=>document.querySelector(sel);
+  const getVal = (id)=>document.getElementById(id)?.value || '';
+  const setVal = (id,v)=>{ const el=document.getElementById(id); if(el) el.value = v||''; };
+
+  function buildKeyFromValues(s,p){
+    s = (s||'').trim(); p = (p||'').trim();
+    return (s && p) ? `tireapp:v1:${s}:${p}` : null;
+  }
   function key(){
-    const s = elStation?.value?.trim();
-    const p = elPlate?.value?.trim();
-    if(!s || !p) return null;
-    return `tireapp:v1:${s}:${p}`;
+    return buildKeyFromValues(elStation?.value, elPlate?.value);
   }
 
   function collect(){
-    const g = id => document.getElementById(id)?.value || '';
     return {
-      station: byName('station')?.value || '',
+      station: elStation?.value || '',
       model: byName('model')?.value || '',
-      plate_full: byName('plate_full')?.value || '',
+      plate_full: elPlate?.value || '',
       std_f: byName('std_f')?.value || '',
       std_r: byName('std_r')?.value || '',
-      tread_rf: g('tread_rf'), pre_rf: g('pre_rf'), dot_rf: g('dot_rf'),
-      tread_lf: g('tread_lf'), pre_lf: g('pre_lf'), dot_lf: g('dot_lf'),
-      tread_lr: g('tread_lr'), pre_lr: g('pre_lr'), dot_lr: g('dot_lr'),
-      tread_rr: g('tread_rr'), pre_rr: g('pre_rr'), dot_rr: g('dot_rr'),
-      unlock: document.getElementById('unlockTime')?.textContent || '',
-      lock:   document.getElementById('lockTime')?.textContent || '',
+      tread_rf: getVal('tread_rf'), pre_rf: getVal('pre_rf'), dot_rf: getVal('dot_rf'),
+      tread_lf: getVal('tread_lf'), pre_lf: getVal('pre_lf'), dot_lf: getVal('dot_lf'),
+      tread_lr: getVal('tread_lr'), pre_lr: getVal('pre_lr'), dot_lr: getVal('dot_lr'),
+      tread_rr: getVal('tread_rr'), pre_rr: getVal('pre_rr'), dot_rr: getVal('dot_rr'),
+      unlock: get('#unlockTime')?.textContent || '',
+      lock:   get('#lockTime')?.textContent || '',
       ts: Date.now()
     };
   }
 
   function apply(d){
     if(!d) return;
-    const setName = (n,v)=>{ const el=byName(n); if(el) el.value = v||''; };
+    const setName=(n,v)=>{ const el=byName(n); if(el) el.value=v||''; };
     setName('station', d.station); setName('model', d.model); setName('plate_full', d.plate_full);
     setName('std_f', d.std_f); setName('std_r', d.std_r);
-    const setId = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-    ['tread_rf','pre_rf','dot_rf','tread_lf','pre_lf','dot_lf','tread_lr','pre_lr','dot_lr','tread_rr','pre_rr','dot_rr']
-      .forEach(k=> setId(k, d[k]));
-    if(d.unlock){ const u=document.getElementById('unlockTime'); if(u) u.textContent=d.unlock; }
-    if(d.lock){   const l=document.getElementById('lockTime');   if(l) l.textContent=d.lock;   }
+    setVal('tread_rf', d.tread_rf); setVal('pre_rf', d.pre_rf); setVal('dot_rf', d.dot_rf);
+    setVal('tread_lf', d.tread_lf); setVal('pre_lf', d.pre_lf); setVal('dot_lf', d.dot_lf);
+    setVal('tread_lr', d.tread_lr); setVal('pre_lr', d.pre_lr); setVal('dot_lr', d.dot_lr);
+    setVal('tread_rr', d.tread_rr); setVal('pre_rr', d.pre_rr); setVal('dot_rr', d.dot_rr);
+    if(d.unlock){ const u=get('#unlockTime'); if(u) u.textContent=d.unlock; }
+    if(d.lock){   const l=get('#lockTime');   if(l) l.textContent=d.lock;   }
   }
 
   function save(){
     const k = key(); if(!k) return;
-    try{ localStorage.setItem(k, JSON.stringify(collect())); }catch(e){}
-  }
-
-  function restore(){
-    const k = key(); if(!k) return;
     try{
-      const s = localStorage.getItem(k); if(!s) return;
-      const d = JSON.parse(s);
-      if(d.ts && (Date.now()-d.ts) > 36*60*60*1000) return; // 36h staleness guard
-      apply(d);
+      localStorage.setItem(k, JSON.stringify(collect()));
+      sessionStorage.setItem(LAST_KEY, k);
     }catch(e){}
   }
 
-  let t=0;
-  function queueSave(){ clearTimeout(t); t=setTimeout(save, 500); }
+  function restoreFromKey(k){
+    try{
+      const s = localStorage.getItem(k); if(!s) return false;
+      const d = JSON.parse(s);
+      if(d.ts && (Date.now()-d.ts) > 36*60*60*1000) return false; // 36h guard
+      apply(d);
+      return true;
+    }catch(e){ return false; }
+  }
 
-  Array.from(document.querySelectorAll('input')).forEach(el=> el.addEventListener('input', queueSave));
+  function restore(){
+    const k = key();
+    if(k) restoreFromKey(k);
+  }
 
-  document.getElementById('unlockBtn')?.addEventListener('click', ()=> setTimeout(save,0));
-  document.getElementById('lockBtn')?.addEventListener('click', ()=> setTimeout(save,0));
+  // immediate save on every input (no debounce)
+  Array.from(document.querySelectorAll('input')).forEach(el=>{
+    el.addEventListener('input', save);
+    el.addEventListener('change', save);
+  });
 
+  // watch unlock/lock DOM changes
+  ['#unlockTime','#lockTime'].forEach(sel=>{
+    const node = get(sel);
+    if(!node) return;
+    const mo = new MutationObserver(()=>save());
+    mo.observe(node, {characterData:true, subtree:true, childList:true});
+  });
+
+  // record buttons
+  get('#unlockBtn')?.addEventListener('click', ()=> setTimeout(save, 0));
+  get('#lockBtn')?.addEventListener('click',  ()=> {
+    setTimeout(save, 0);
+    // new car開始時の誤復元を避けるため、セッション側の lastKey は解除
+    setTimeout(()=> sessionStorage.removeItem(LAST_KEY), 10);
+  });
+
+  // page lifecycle hooks for iOS Safari
+  window.addEventListener('visibilitychange', ()=> { if(document.visibilityState==='hidden') save(); });
+  window.addEventListener('pagehide', save);
+  window.addEventListener('beforeunload', save);
+
+  // when station/plate change, try restoring keyed save
   elStation?.addEventListener('change', restore);
   elPlate?.addEventListener('change', restore);
 
-  // try at load (URLからの自動入力対応時も拾う)
-  restore();
-})();
+  // reload convenience: if same tab reload, use lastKey
+  const lastK = sessionStorage.getItem(LAST_KEY);
+  if(lastK) restoreFromKey(lastK);
+
+})(); 
 // --- end autosave ---
 

@@ -119,7 +119,6 @@ if (form) form.addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const p = buildPayload();
   const lines = [
-    p.plate_full, p.model, '',
     `解錠　${p.unlock||'--:--'}`, `施錠　${p.lock||'--:--'}`, '',
     `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}${(p.std_f&&p.std_r)?`    ${p.std_f}-${p.std_r}`:''}   RF`,
     `${p.tread_lf} ${p.pre_lf} ${p.dot_lf}   LF`,

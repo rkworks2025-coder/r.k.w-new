@@ -131,9 +131,7 @@ if (form) form.addEventListener('submit', async (ev)=>{
   // 結果画面更新（stationも先頭に）
   resHeader.textContent = (p.station? (p.station+'\n') : '') + p.plate_full + '\n' + p.model;
   resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
-  let out = lines;
-out = out.replace(/^\s*解錠[^\n]*\n施錠[^\n]*\n\s*/, '');
-resLines.textContent = out;
+  resLines.textContent = lines;
 
   form.style.display = 'none';
   resultCard.style.display = 'block';
@@ -148,113 +146,69 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
-// --- autosave module (1 block; station+plate keyed, session lastKey for reload) ---
+// --- prev labels module (1 block) ---
+// UI-only: show previous values next to labels in orange, same font size.
 (function(){
-  const byName = (n)=>document.querySelector(`[name="${n}"]`);
-  const elStation = byName('station');
-  const elPlate   = byName('plate_full');
-  const LAST_KEY  = 'tireapp:lastKey';
-
-  const get = (sel)=>document.querySelector(sel);
-  const getVal = (id)=>document.getElementById(id)?.value || '';
-  const setVal = (id,v)=>{ const el=document.getElementById(id); if(el) el.value = v||''; };
-
-  function buildKeyFromValues(s,p){
-    s = (s||'').trim(); p = (p||'').trim();
-    return (s && p) ? `tireapp:v1:${s}:${p}` : null;
-  }
-  function key(){
-    return buildKeyFromValues(elStation?.value, elPlate?.value);
-  }
-
-  function collect(){
-    return {
-      station: elStation?.value || '',
-      model: byName('model')?.value || '',
-      plate_full: elPlate?.value || '',
-      std_f: byName('std_f')?.value || '',
-      std_r: byName('std_r')?.value || '',
-      tread_rf: getVal('tread_rf'), pre_rf: getVal('pre_rf'), dot_rf: getVal('dot_rf'),
-      tread_lf: getVal('tread_lf'), pre_lf: getVal('pre_lf'), dot_lf: getVal('dot_lf'),
-      tread_lr: getVal('tread_lr'), pre_lr: getVal('pre_lr'), dot_lr: getVal('dot_lr'),
-      tread_rr: getVal('tread_rr'), pre_rr: getVal('pre_rr'), dot_rr: getVal('dot_rr'),
-      unlock: get('#unlockTime')?.textContent || '',
-      lock:   get('#lockTime')?.textContent || '',
-      ts: Date.now()
-    };
+  function setCapPrevByInputId(inputId, baseLabel, prevVal){
+    if(prevVal == null || prevVal === '') return;
+    const el = document.getElementById(inputId);
+    if(!el) return;
+    const row = el.closest('.tire-row');
+    const cap = el.parentElement?.querySelector('.cap');
+    if(!cap) return;
+    // shorten for DOT fields
+    if(/^(dot_)/.test(inputId)) baseLabel = '製造';
+    // clear old prev span
+    const old = cap.querySelector('.prev-inline'); if(old) old.remove();
+    // reset base text (avoid重複)
+    cap.textContent = baseLabel;
+    const span = document.createElement('span');
+    span.className = 'prev-inline';
+    span.textContent = ` (前回 ${prevVal})`;
+    cap.appendChild(span);
+    if(row) row.classList.add('has-prev');
   }
 
-  function apply(d){
-    if(!d) return;
-    const setName=(n,v)=>{ const el=byName(n); if(el) el.value=v||''; };
-    setName('station', d.station); setName('model', d.model); setName('plate_full', d.plate_full);
-    setName('std_f', d.std_f); setName('std_r', d.std_r);
-    setVal('tread_rf', d.tread_rf); setVal('pre_rf', d.pre_rf); setVal('dot_rf', d.dot_rf);
-    setVal('tread_lf', d.tread_lf); setVal('pre_lf', d.pre_lf); setVal('dot_lf', d.dot_lf);
-    setVal('tread_lr', d.tread_lr); setVal('pre_lr', d.pre_lr); setVal('dot_lr', d.dot_lr);
-    setVal('tread_rr', d.tread_rr); setVal('pre_rr', d.pre_rr); setVal('dot_rr', d.dot_rr);
-    if(d.unlock){ const u=get('#unlockTime'); if(u) u.textContent=d.unlock; }
-    if(d.lock){   const l=get('#lockTime');   if(l) l.textContent=d.lock;   }
+  // public: apply previous values object
+  // prev = { tread_rf, pre_rf, dot_rf, ... 同名キー }
+  window.applyPrevInlineLabels = function(prev){
+    if(!prev) return;
+    setCapPrevByInputId('tread_rf','残溝', prev.tread_rf);
+    setCapPrevByInputId('pre_rf','空気圧', prev.pre_rf);
+    setCapPrevByInputId('dot_rf','製造年週', prev.dot_rf);
+
+    setCapPrevByInputId('tread_lf','残溝', prev.tread_lf);
+    setCapPrevByInputId('pre_lf','空気圧', prev.pre_lf);
+    setCapPrevByInputId('dot_lf','製造年週', prev.dot_lf);
+
+    setCapPrevByInputId('tread_lr','残溝', prev.tread_lr);
+    setCapPrevByInputId('pre_lr','空気圧', prev.pre_lr);
+    setCapPrevByInputId('dot_lr','製造年週', prev.dot_lr);
+
+    setCapPrevByInputId('tread_rr','残溝', prev.tread_rr);
+    setCapPrevByInputId('pre_rr','空気圧', prev.pre_rr);
+    setCapPrevByInputId('dot_rr','製造年週', prev.dot_rr);
+  };
+
+  // hook: when station + plate filled, try fetching from PREV_API_URL if provided
+  function val(sel){ const el=document.querySelector(sel); return el ? el.value.trim() : ''; }
+  function tryFetchPrev(){
+    const station = document.querySelector('[name="station"]')?.value?.trim() || document.getElementById('station')?.value?.trim() || '';
+    const plate   = document.querySelector('[name="plate_full"]')?.value?.trim() || document.getElementById('plate_full')?.value?.trim() || '';
+    if(!station || !plate) return;
+    if(!window.PREV_API_URL){ return; } // UI-only phase: no request if URL未設定
+    const url = `${window.PREV_API_URL}?station=${encodeURIComponent(station)}&plate_full=${encodeURIComponent(plate)}`;
+    fetch(url).then(r=>r.json()).then(j=>{
+      if(j && j.status === 'ok' && j.data){ window.applyPrevInlineLabels(j.data); }
+    }).catch(()=>{});
   }
 
-  function save(){
-    const k = key(); if(!k) return;
-    try{
-      localStorage.setItem(k, JSON.stringify(collect()));
-      sessionStorage.setItem(LAST_KEY, k);
-    }catch(e){}
-  }
+  // trigger when station/plate changed
+  const st = document.querySelector('[name="station"],#station'); if(st) st.addEventListener('change', tryFetchPrev);
+  const pl = document.querySelector('[name="plate_full"],#plate_full'); if(pl) pl.addEventListener('change', tryFetchPrev);
 
-  function restoreFromKey(k){
-    try{
-      const s = localStorage.getItem(k); if(!s) return false;
-      const d = JSON.parse(s);
-      if(d.ts && (Date.now()-d.ts) > 36*60*60*1000) return false; // 36h guard
-      apply(d);
-      return true;
-    }catch(e){ return false; }
-  }
-
-  function restore(){
-    const k = key();
-    if(k) restoreFromKey(k);
-  }
-
-  // immediate save on every input (no debounce)
-  Array.from(document.querySelectorAll('input')).forEach(el=>{
-    el.addEventListener('input', save);
-    el.addEventListener('change', save);
-  });
-
-  // watch unlock/lock DOM changes
-  ['#unlockTime','#lockTime'].forEach(sel=>{
-    const node = get(sel);
-    if(!node) return;
-    const mo = new MutationObserver(()=>save());
-    mo.observe(node, {characterData:true, subtree:true, childList:true});
-  });
-
-  // record buttons
-  get('#unlockBtn')?.addEventListener('click', ()=> setTimeout(save, 0));
-  get('#lockBtn')?.addEventListener('click',  ()=> {
-    setTimeout(save, 0);
-    // new car開始時の誤復元を避けるため、セッション側の lastKey は解除
-    setTimeout(()=> sessionStorage.removeItem(LAST_KEY), 10);
-  });
-
-  // page lifecycle hooks for iOS Safari
-  window.addEventListener('visibilitychange', ()=> { if(document.visibilityState==='hidden') save(); });
-  window.addEventListener('pagehide', save);
-  window.addEventListener('beforeunload', save);
-
-  // when station/plate change, try restoring keyed save
-  elStation?.addEventListener('change', restore);
-  elPlate?.addEventListener('change', restore);
-
-  // reload convenience: if same tab reload, use lastKey
-  const lastK = sessionStorage.getItem(LAST_KEY);
-  if(lastK) restoreFromKey(lastK);
-
-})(); 
-// --- end autosave ---
+  // also attempt on load (URLパラメータによる自動入力対策)
+  document.addEventListener('DOMContentLoaded', tryFetchPrev);
+})();
+// --- end prev labels module ---
 

@@ -415,3 +415,53 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 
 })(); 
 // === end reload-restore module ===
+
+
+// === unlock/lock time mirror (1-block tweak) ===
+(function(){
+  function setHidden(id, val){
+    var el = document.getElementById(id);
+    if (el) el.value = val || '';
+  }
+  function getHidden(id){
+    var el = document.getElementById(id);
+    return el ? (el.value||'') : '';
+  }
+  function setDisplay(id, val){
+    var el = document.getElementById(id);
+    if (el) el.textContent = val || '';
+  }
+  // when buttons set #unlockTime / #lockTime, also mirror to hidden
+  var uLbl = document.getElementById('unlockTime');
+  var lLbl = document.getElementById('lockTime');
+  if (uLbl){
+    var moU = new MutationObserver(function(){
+      setHidden('unlockTimeHidden', uLbl.textContent.trim());
+    });
+    moU.observe(uLbl, {characterData:true, childList:true, subtree:true});
+  }
+  if (lLbl){
+    var moL = new MutationObserver(function(){
+      setHidden('lockTimeHidden', lLbl.textContent.trim());
+    });
+    moL.observe(lLbl, {characterData:true, childList:true, subtree:true});
+  }
+  // on DOM ready, if hidden has values (from restore), write back to display
+  document.addEventListener('DOMContentLoaded', function(){
+    var u = getHidden('unlockTimeHidden');
+    var l = getHidden('lockTimeHidden');
+    if (u && (!uLbl || !uLbl.textContent.trim())) setDisplay('unlockTime', u);
+    if (l && (!lLbl || !lLbl.textContent.trim())) setDisplay('lockTime', l);
+    // try again after a tick in case initializers run late
+    setTimeout(function(){
+      var u2 = getHidden('unlockTimeHidden');
+      var l2 = getHidden('lockTimeHidden');
+      var uEl = document.getElementById('unlockTime');
+      var lEl = document.getElementById('lockTime');
+      if (u2 && uEl && (!uEl.textContent || !uEl.textContent.trim())) uEl.textContent = u2;
+      if (l2 && lEl && (!lEl.textContent || !lEl.textContent.trim())) lEl.textContent = l2;
+    }, 80);
+  }, {once:true});
+})();
+// === end mirror ===
+

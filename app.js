@@ -146,88 +146,59 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
-// --- reload confirm module (1 block) ---
+// --- reload recovery module (1 block; Safari-safe, guarded) ---
 (function(){
-  // Track dirty state only while the input form is visible
-  const form = document.getElementById('form');
-  const resultCard = document.getElementById('resultCard');
-  if(!form) return;
-
-  let isDirty = false;
-  const setDirty = ()=>{ isDirty = true; };
-  form.querySelectorAll('input, textarea, select').forEach(el=>{
-    el.addEventListener('input', setDirty, {passive:true});
-    el.addEventListener('change', setDirty, {passive:true});
-  });
-
-  function formVisible(){
-    // visible when resultCard is hidden OR form's display is not 'none'
-    const rcVis = resultCard && getComputedStyle(resultCard).display !== 'none';
-    const fmVis = getComputedStyle(form).display !== 'none';
-    // we want guard only when INPUT form is visible
-    return fmVis && !rcVis;
-  }
-
-  window.addEventListener('beforeunload', function(e){
-    if (formVisible() && isDirty){
-      e.preventDefault();
-      e.returnValue = ''; // show standard confirm dialog
-    }
-  });
-})();
-// --- end reload confirm module ---
-
-
-// --- reload recovery module (1 block; Safari-safe, selector-agnostic) ---
-(function(){
-  // Util
+  let isRestoring = false;
   const dq = (s)=>document.querySelector(s);
   const getVal = (sel)=>{ const el=dq(sel); return el? (el.value||'').trim() : ''; };
-  const encode = (s)=>encodeURIComponent(s);
+  const enc = (s)=>encodeURIComponent(s);
 
   function getKey(){
     const station = getVal('[name="station"],#station');
     const plate   = getVal('[name="plate_full"],#plate_full');
     if(!station || !plate) return null;
-    return 'tireapp:'+encode(station)+'|'+encode(plate);
+    return 'tireapp:'+enc(station)+'|'+enc(plate);
   }
-
   function snapshot(){
     const data = {};
     document.querySelectorAll('input, textarea, select').forEach(el=>{
       const id = el.id || el.name;
       if(!id) return;
-      if(el.type === 'checkbox' || el.type === 'radio'){
-        data[id] = !!el.checked;
-      } else {
-        data[id] = el.value;
-      }
+      data[id] = (el.type==='checkbox'||el.type==='radio') ? !!el.checked : el.value;
     });
     return data;
   }
   function applySnapshot(data){
     if(!data) return;
-    Object.keys(data).forEach(k=>{
-      const el = document.querySelector('#'+CSS.escape(k)+', [name="'+k+'"]');
-      if(!el) return;
-      if(el.type === 'checkbox' || el.type === 'radio'){
-        el.checked = !!data[k];
-      } else {
-        el.value = data[k];
-        try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(_){}
-        try { el.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
-      }
-    });
+    isRestoring = true;
+    try{
+      Object.keys(data).forEach(k=>{
+        const el = document.querySelector('#'+CSS.escape(k)+', [name="'+k+'"]');
+        if(!el) return;
+        if(el.type==='checkbox'||el.type==='radio'){
+          el.checked = !!data[k];
+        }else{
+          const prev = el.value;
+          el.value = data[k];
+          const isStation = (k==='station' || k==='plate_full');
+          if(!isStation && prev !== el.value){
+            try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(_){}
+            try { el.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+          }
+        }
+      });
+    } finally {
+      isRestoring = false;
+    }
   }
-
   function save(){
+    if(isRestoring) return;
     const key = getKey();
     if(!key) return;
-    try {
-      sessionStorage.setItem(key, JSON.stringify(snapshot()));
-    }catch(e){}
+    try{ sessionStorage.setItem(key, JSON.stringify(snapshot())); }catch(e){}
   }
   function restoreIfAny(){
+    if(isRestoring) return;
     const key = getKey();
     if(!key) return;
     try{
@@ -237,21 +208,20 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
     }catch(e){}
   }
 
-  // Save on any edit (no debounce; document-wide)
+  // Save hooks
   document.querySelectorAll('input, textarea, select').forEach(el=>{
     el.addEventListener('input', save, {passive:true});
     el.addEventListener('change', save, {passive:true});
   });
-
-  // Restore when station/plate become available/changed (input & change)
-  const st = dq('[name="station"],#station'); st && st.addEventListener('input', restoreIfAny, {passive:true});
-  const pl = dq('[name="plate_full"],#plate_full'); pl && pl.addEventListener('input', restoreIfAny, {passive:true});
+  // Restore hooks
+  const st = dq('[name="station"],#station');
+  const pl = dq('[name="plate_full"],#plate_full');
+  st && st.addEventListener('input', restoreIfAny, {passive:true});
+  pl && pl.addEventListener('input', restoreIfAny, {passive:true});
   st && st.addEventListener('change', restoreIfAny, {passive:true});
   pl && pl.addEventListener('change', restoreIfAny, {passive:true});
 
-  // Try at DOMContentLoaded too (works when URLパラメータで既に入っている場合)
   document.addEventListener('DOMContentLoaded', restoreIfAny);
 })();
 // --- end reload recovery module ---
-
 

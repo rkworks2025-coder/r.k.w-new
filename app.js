@@ -177,24 +177,24 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 })();
 // --- end reload confirm module ---
 
-// --- reload recovery module (1 block; Safari-safe) ---
-(function(){
-  const form = document.getElementById('form');
-  if(!form) return;
 
-  // Helpers
-  const qs = (s)=>document.querySelector(s);
-  const getVal = (sel)=>{ const el=qs(sel); return el? (el.value||'').trim() : ''; };
+// --- reload recovery module (1 block; Safari-safe, selector-agnostic) ---
+(function(){
+  // Util
+  const dq = (s)=>document.querySelector(s);
+  const getVal = (sel)=>{ const el=dq(sel); return el? (el.value||'').trim() : ''; };
+  const encode = (s)=>encodeURIComponent(s);
+
   function getKey(){
     const station = getVal('[name="station"],#station');
     const plate   = getVal('[name="plate_full"],#plate_full');
     if(!station || !plate) return null;
-    return 'tireapp:'+station+'|'+plate;
+    return 'tireapp:'+encode(station)+'|'+encode(plate);
   }
 
-  function snapshotForm(){
+  function snapshot(){
     const data = {};
-    form.querySelectorAll('input, textarea, select').forEach(el=>{
+    document.querySelectorAll('input, textarea, select').forEach(el=>{
       const id = el.id || el.name;
       if(!id) return;
       if(el.type === 'checkbox' || el.type === 'radio'){
@@ -208,13 +208,12 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   function applySnapshot(data){
     if(!data) return;
     Object.keys(data).forEach(k=>{
-      const el = form.querySelector('#'+CSS.escape(k)+', [name="'+k+'"]');
+      const el = document.querySelector('#'+CSS.escape(k)+', [name="'+k+'"]');
       if(!el) return;
       if(el.type === 'checkbox' || el.type === 'radio'){
         el.checked = !!data[k];
       } else {
         el.value = data[k];
-        // fire input to trigger any formatting/auto-advance handlers already in app.js
         try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(_){}
         try { el.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
       }
@@ -225,9 +224,8 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
     const key = getKey();
     if(!key) return;
     try {
-      const data = snapshotForm();
-      sessionStorage.setItem(key, JSON.stringify(data));
-    } catch(e) {}
+      sessionStorage.setItem(key, JSON.stringify(snapshot()));
+    }catch(e){}
   }
   function restoreIfAny(){
     const key = getKey();
@@ -235,23 +233,25 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
     try{
       const raw = sessionStorage.getItem(key);
       if(!raw) return;
-      const data = JSON.parse(raw);
-      applySnapshot(data);
+      applySnapshot(JSON.parse(raw));
     }catch(e){}
   }
 
-  // Save on edits (immediate; no debounce to avoid missing quick reloads)
-  form.querySelectorAll('input, textarea, select').forEach(el=>{
+  // Save on any edit (no debounce; document-wide)
+  document.querySelectorAll('input, textarea, select').forEach(el=>{
     el.addEventListener('input', save, {passive:true});
     el.addEventListener('change', save, {passive:true});
   });
 
-  // When station/plate changes, restore matching snapshot (if any)
-  const st = qs('[name="station"],#station'); st && st.addEventListener('change', restoreIfAny, {passive:true});
-  const pl = qs('[name="plate_full"],#plate_full'); pl && pl.addEventListener('change', restoreIfAny, {passive:true});
+  // Restore when station/plate become available/changed (input & change)
+  const st = dq('[name="station"],#station'); st && st.addEventListener('input', restoreIfAny, {passive:true});
+  const pl = dq('[name="plate_full"],#plate_full'); pl && pl.addEventListener('input', restoreIfAny, {passive:true});
+  st && st.addEventListener('change', restoreIfAny, {passive:true});
+  pl && pl.addEventListener('change', restoreIfAny, {passive:true});
 
-  // On load: if both present, attempt restore
+  // Try at DOMContentLoaded too (works when URLパラメータで既に入っている場合)
   document.addEventListener('DOMContentLoaded', restoreIfAny);
 })();
 // --- end reload recovery module ---
+
 

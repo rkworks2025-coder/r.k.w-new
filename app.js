@@ -148,18 +148,23 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 
 // --- prev labels module (1 block; UI-only + fetch) ---
 (function(){
+  // default endpoint (can be overridden by defining window.PREV_API_URL earlier)
   window.PREV_API_URL = window.PREV_API_URL || "https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec";
+
   function val(sel){ const el=document.querySelector(sel); return el? el.value.trim():''; }
   function capOf(id){ const el=document.getElementById(id); return el?.parentElement?.querySelector('.cap')||null; }
   function rightLabOfId(id){ const el=document.getElementById(id); return el?.closest('.tire-row')?.querySelector('.lab')||null; }
+
   function setPrev(id, base, v){
     if(v==null || v==='') return;
     const cap = capOf(id); if(!cap) return;
-    const label = /^dot_/.test(id) ? '製造' : base;
+    const label = /^dot_/.test(id) ? '製造' : base; // 製造年週は短縮表示
     cap.textContent = label;
     const span=document.createElement('span'); span.style.color='#ff8c00'; span.textContent=' (前回 '+v+')'; cap.appendChild(span);
-    if(/^dot_/.test(id)){ const lab=rightLabOfId(id); if(lab) lab.style.fontSize='90%'; }
+    if(/^dot_/.test(id)){ const lab=rightLabOfId(id); if(lab) lab.style.fontSize='90%'; } // 横幅対策
   }
+
+  // 公開関数（テスト注入用にも使える）
   window.applyPrevInlineLabels = function(prev){
     if(!prev) return;
     setPrev('tread_rf','残溝', prev.tread_rf); setPrev('pre_rf','空気圧', prev.pre_rf); setPrev('dot_rf','製造年週', prev.dot_rf);
@@ -167,12 +172,14 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
     setPrev('tread_lr','残溝', prev.tread_lr); setPrev('pre_lr','空気圧', prev.pre_lr); setPrev('dot_lr','製造年週', prev.dot_lr);
     setPrev('tread_rr','残溝', prev.tread_rr); setPrev('pre_rr','空気圧', prev.pre_rr); setPrev('dot_rr','製造年週', prev.dot_rr);
   };
+
   function tryFetch(){
     const s = val('[name="station"],#station'); const p = val('[name="plate_full"],#plate_full');
     if(!s || !p || !window.PREV_API_URL) return;
     const url = window.PREV_API_URL+'?station='+encodeURIComponent(s)+'&plate_full='+encodeURIComponent(p);
     fetch(url).then(r=>r.json()).then(j=>{ if(j && j.status==='ok' && j.data) applyPrevInlineLabels(j.data); }).catch(()=>{});
   }
+
   document.addEventListener('DOMContentLoaded', tryFetch);
   const st=document.querySelector('[name="station"],#station'); st&&st.addEventListener('change', tryFetch);
   const pl=document.querySelector('[name="plate_full"],#plate_full'); pl&&pl.addEventListener('change', tryFetch);

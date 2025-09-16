@@ -263,6 +263,12 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       const v = (el.type === 'checkbox' || el.type === 'radio') ? !!el.checked : el.value;
       data[id] = v;
     });
+    // also capture display-only time texts (unlockTime, lockTime)
+    const textElems = ['unlockTime','lockTime'];
+    textElems.forEach(id => {
+      const el = document.getElementById(id);
+      if(el) data[id] = (el.textContent || '').trim();
+    });
     return { t: now(), data };
   }
 
@@ -290,7 +296,7 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       }else{
         const prev = el.value;
         el.value = obj.data[k];
-        // station / plate は外部キーなので復元でのイベント発火は抑制
+        // station / plate is external key so suppress event firing for those
         if (k !== 'station' && k !== 'plate_full' && prev !== el.value){
           try{ el.dispatchEvent(new Event('input', {bubbles:true})); }catch(_){}
           try{ el.dispatchEvent(new Event('change', {bubbles:true})); }catch(_){}
@@ -298,6 +304,15 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       }
       applied = true;
     }
+    // restore display-only time texts if present
+    try{
+      ['unlockTime','lockTime'].forEach(id =>{
+        if(obj.data && obj.data[id] && String(obj.data[id]).length){
+          const el = document.getElementById(id);
+          if(el) el.textContent = obj.data[id];
+        }
+      });
+    }catch(e){}
     return applied;
   }
 
@@ -364,4 +379,3 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 
 })(); 
 // === end reload-restore module ===
-

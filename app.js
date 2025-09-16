@@ -146,82 +146,162 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
-// --- reload recovery module (1 block; Safari-safe, guarded) ---
+// --- reload confirm module (1 block) ---
 (function(){
-  let isRestoring = false;
-  const dq = (s)=>document.querySelector(s);
-  const getVal = (sel)=>{ const el=dq(sel); return el? (el.value||'').trim() : ''; };
-  const enc = (s)=>encodeURIComponent(s);
+  // Track dirty state only while the input form is visible
+  const form = document.getElementById('form');
+  const resultCard = document.getElementById('resultCard');
+  if(!form) return;
 
-  function getKey(){
-    const station = getVal('[name="station"],#station');
-    const plate   = getVal('[name="plate_full"],#plate_full');
-    if(!station || !plate) return null;
-    return 'tireapp:'+enc(station)+'|'+enc(plate);
+  let isDirty = false;
+  const setDirty = ()=>{ isDirty = true; };
+  form.querySelectorAll('input, textarea, select').forEach(el=>{
+    el.addEventListener('input', setDirty, {passive:true});
+    el.addEventListener('change', setDirty, {passive:true});
+  });
+
+  function formVisible(){
+    // visible when resultCard is hidden OR form's display is not 'none'
+    const rcVis = resultCard && getComputedStyle(resultCard).display !== 'none';
+    const fmVis = getComputedStyle(form).display !== 'none';
+    // we want guard only when INPUT form is visible
+    return fmVis && !rcVis;
   }
-  function snapshot(){
+
+    if (formVisible() && isDirty){
+      e.preventDefault();
+      e.returnValue = ''; // show standard confirm dialog
+    }
+  });
+})();
+// --- end reload confirm module ---
+
+// --- reload recovery module (1 block; v3t-spec robust) ---
+(function(){
+  const TTL_MS = 24*60*60*1000; // 24h
+  const DRAFT_NS = 'tireapp'; // namespace
+
+  const dq = (s)=>document.querySelector(s);
+  const now = ()=>Date.now();
+  const enc = (s)=>encodeURIComponent(s||'');
+  const keyFor = (station, plate)=> `${DRAFT_NS}:${enc(station)}|${enc(plate)}`;
+  const LAST_KEY = `${DRAFT_NS}:lastKey`; // sessionStorage (same tab)
+
+  function getField(selector){
+    const el = document.querySelector(selector);
+    return el && (el.value||'').trim();
+  }
+  function getStation(){ return getField('[name="station"],#station'); }
+  function getPlate(){ return getField('[name="plate_full"],#plate_full'); }
+
+  function getCurrentKey(){
+    const st = getStation();
+    const pl = getPlate();
+    if(!st || !pl) return null;
+    return keyFor(st, pl);
+  }
+
+  function snapshotForm(){
     const data = {};
     document.querySelectorAll('input, textarea, select').forEach(el=>{
       const id = el.id || el.name;
       if(!id) return;
       data[id] = (el.type==='checkbox'||el.type==='radio') ? !!el.checked : el.value;
     });
-    return data;
+    return { t: now(), data };
   }
-  function applySnapshot(data){
-    if(!data) return;
-    isRestoring = true;
+
+  function saveDraft(){
+    const k = getCurrentKey();
+    if(!k) return;
+    try {
+      const snap = snapshotForm();
+      localStorage.setItem(k, JSON.stringify(snap));
+      sessionStorage.setItem(LAST_KEY, k);
+    } catch(e) {}
+  }
+
+  function expired(ts){ return (now() - ts) > TTL_MS; }
+
+  function applySnapshotData(obj){
+    if(!obj || !obj.data) return false;
+    const data = obj.data;
+    let applied = false;
     try{
       Object.keys(data).forEach(k=>{
         const el = document.querySelector('#'+CSS.escape(k)+', [name="'+k+'"]');
         if(!el) return;
         if(el.type==='checkbox'||el.type==='radio'){
           el.checked = !!data[k];
-        }else{
+        } else {
           const prev = el.value;
           el.value = data[k];
-          const isStation = (k==='station' || k==='plate_full');
-          if(!isStation && prev !== el.value){
+          if(k!=='station' && k!=='plate_full' && prev !== el.value){
             try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(_){}
             try { el.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
           }
         }
+        applied = true;
       });
-    } finally {
-      isRestoring = false;
-    }
-  }
-  function save(){
-    if(isRestoring) return;
-    const key = getKey();
-    if(!key) return;
-    try{ sessionStorage.setItem(key, JSON.stringify(snapshot())); }catch(e){}
-  }
-  function restoreIfAny(){
-    if(isRestoring) return;
-    const key = getKey();
-    if(!key) return;
-    try{
-      const raw = sessionStorage.getItem(key);
-      if(!raw) return;
-      applySnapshot(JSON.parse(raw));
     }catch(e){}
+    return applied;
   }
 
-  // Save hooks
-  document.querySelectorAll('input, textarea, select').forEach(el=>{
-    el.addEventListener('input', save, {passive:true});
-    el.addEventListener('change', save, {passive:true});
-  });
-  // Restore hooks
-  const st = dq('[name="station"],#station');
-  const pl = dq('[name="plate_full"],#plate_full');
-  st && st.addEventListener('input', restoreIfAny, {passive:true});
-  pl && pl.addEventListener('input', restoreIfAny, {passive:true});
-  st && st.addEventListener('change', restoreIfAny, {passive:true});
-  pl && pl.addEventListener('change', restoreIfAny, {passive:true});
+  function tryRestoreByKey(k){
+    if(!k) return false;
+    try{
+      const raw = localStorage.getItem(k);
+      if(!raw) return false;
+      const obj = JSON.parse(raw);
+      if(!obj || !obj.t || expired(obj.t)) return false;
+      return applySnapshotData(obj);
+    }catch(e){ return false; }
+  }
 
-  document.addEventListener('DOMContentLoaded', restoreIfAny);
+  document.querySelectorAll('input, textarea, select').forEach(el=>{
+    el.addEventListener('input', saveDraft,  {passive:true});
+    el.addEventListener('change', saveDraft, {passive:true});
+  });
+  window.addEventListener('pagehide', saveDraft, {passive:true});
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'hidden') saveDraft();
+  }, {passive:true});
+
+  function isReloadNavigation(){
+    try{
+      const perf = performance.getEntriesByType && performance.getEntriesByType('navigation');
+      if (perf && perf[0] && perf[0].type) return perf[0].type === 'reload';
+    }catch(e){}
+    try{
+      return performance && performance.navigation && performance.navigation.type === 1;
+    }catch(e){}
+    return false;
+  }
+
+  function restoreOnReloadIfPossible(){
+    if (!isReloadNavigation()) return;
+    const lastK = sessionStorage.getItem(LAST_KEY);
+    if (!lastK) return;
+    tryRestoreByKey(lastK);
+  }
+
+  function restoreWhenKeyAvailable(){
+    const k = getCurrentKey();
+    if (!k) return;
+    tryRestoreByKey(k);
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    restoreOnReloadIfPossible();
+    restoreWhenKeyAvailable();
+  });
+  const stEl = document.querySelector('[name="station"],#station');
+  const plEl = document.querySelector('[name="plate_full"],#plate_full');
+  stEl && stEl.addEventListener('input', restoreWhenKeyAvailable, {passive:true});
+  plEl && plEl.addEventListener('input', restoreWhenKeyAvailable, {passive:true});
+  stEl && stEl.addEventListener('change', restoreWhenKeyAvailable, {passive:true});
+  plEl && plEl.addEventListener('change', restoreWhenKeyAvailable, {passive:true});
+
 })();
 // --- end reload recovery module ---
 

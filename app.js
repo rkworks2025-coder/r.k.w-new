@@ -226,7 +226,7 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 // --- end reload recovery module ---
 
 
-// === tireapp reload-restore module (v3t-equivalent, isolated) ===
+// === tireapp reload-restore module (v3t-equivalent, isolated, enhanced time restore) ===
 (function(){
   if (window.__tireAppReloadRestoreLoaded) return;
   window.__tireAppReloadRestoreLoaded = true;
@@ -234,6 +234,7 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   const TTL_MS = 24*60*60*1000; // 24h
   const NS = 'tireapp';
   const LAST_KEY = NS + ':lastKey'; // sessionStorage per-tab
+  const TIME_IDS = ['unlockTime','lockTime'];
 
   function dq(sel){ return document.querySelector(sel); }
   function now(){ return Date.now(); }
@@ -263,9 +264,8 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       const v = (el.type === 'checkbox' || el.type === 'radio') ? !!el.checked : el.value;
       data[id] = v;
     });
-    // also capture display-only time texts (unlockTime, lockTime)
-    const textElems = ['unlockTime','lockTime'];
-    textElems.forEach(id => {
+    // capture display-only time texts (unlockTime, lockTime)
+    TIME_IDS.forEach(id => {
       const el = document.getElementById(id);
       if(el) data[id] = (el.textContent || '').trim();
     });
@@ -279,7 +279,7 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       const snap = snapshotForm();
       localStorage.setItem(k, JSON.stringify(snap));
       sessionStorage.setItem(LAST_KEY, k);
-    }catch(e){ /* ignore quota or private mode */ }
+    }catch(e){ /* ignore quota/private mode */ }
   }
 
   function expired(ts){ return (now() - ts) > TTL_MS; }
@@ -293,10 +293,9 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       if (!el) continue;
       if (el.type === 'checkbox' || el.type === 'radio'){
         el.checked = !!obj.data[k];
-      }else{
+      }else if ('value' in el){
         const prev = el.value;
         el.value = obj.data[k];
-        // station / plate is external key so suppress event firing for those
         if (k !== 'station' && k !== 'plate_full' && prev !== el.value){
           try{ el.dispatchEvent(new Event('input', {bubbles:true})); }catch(_){}
           try{ el.dispatchEvent(new Event('change', {bubbles:true})); }catch(_){}
@@ -304,27 +303,43 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
       }
       applied = true;
     }
-    // restore display-only time texts if present
+    // restore display-only time texts if present (first pass)
     try{
-      ['unlockTime','lockTime'].forEach(id =>{
+      TIME_IDS.forEach(id =>{
         if(obj.data && obj.data[id] && String(obj.data[id]).length){
           const el = document.getElementById(id);
           if(el) el.textContent = obj.data[id];
         }
       });
     }catch(e){}
+    // schedule second pass after potential initializers run
+    setTimeout(()=>{
+      try{
+        TIME_IDS.forEach(id =>{
+          if(obj.data && obj.data[id] && String(obj.data[id]).length){
+            const el = document.getElementById(id);
+            if(el && (!el.textContent || !el.textContent.trim())) el.textContent = obj.data[id];
+          }
+        });
+      }catch(e){}
+    }, 60);
     return applied;
   }
 
-  function tryRestoreByKey(k){
-    if (!k) return false;
+  function readDraftByKey(k){
     try{
       const raw = localStorage.getItem(k);
-      if (!raw) return false;
+      if (!raw) return null;
       const obj = JSON.parse(raw);
-      if (!obj || !obj.t || expired(obj.t)) return false;
-      return applySnapshot(obj);
-    }catch(e){ return false; }
+      if (!obj || !obj.t || expired(obj.t)) return null;
+      return obj;
+    }catch(e){ return null; }
+  }
+
+  function tryRestoreByKey(k){
+    const obj = readDraftByKey(k);
+    if (!obj) return false;
+    return applySnapshot(obj);
   }
 
   function isReloadNav(){
@@ -343,12 +358,29 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
     const last = sessionStorage.getItem(LAST_KEY);
     if (!last) return;
     tryRestoreByKey(last);
+    // extra pass on load to win against late initializers
+    window.addEventListener('load', ()=>{
+      const obj = readDraftByKey(last);
+      if (obj) applySnapshot(obj);
+    }, {once:true});
   }
 
   function restoreWhenKeyReady(){
     const k = currentKey();
     if (!k) return;
     tryRestoreByKey(k);
+  }
+
+  // watch time labels; when they change, save draft
+  function observeTimeLabels(){
+    TIME_IDS.forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      try{
+        const mo = new MutationObserver(()=> saveDraft());
+        mo.observe(el, {characterData:true, childList:true, subtree:true});
+      }catch(e){}
+    });
   }
 
   // attach lightweight listeners for save
@@ -365,8 +397,13 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 
   // bootstrap
   document.addEventListener('DOMContentLoaded', ()=>{
+    observeTimeLabels();
     restoreOnReload();
     restoreWhenKeyReady();
+    // one more microtask/frame to ensure times persist
+    requestAnimationFrame(()=>{
+      restoreWhenKeyReady();
+    });
   }, {once:true});
 
   // react to key fields becoming available

@@ -146,69 +146,36 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 });
 
-// --- prev labels module (1 block) ---
-// UI-only: show previous values next to labels in orange, same font size.
+// --- prev labels module (1 block; UI-only + fetch) ---
 (function(){
-  function setCapPrevByInputId(inputId, baseLabel, prevVal){
-    if(prevVal == null || prevVal === '') return;
-    const el = document.getElementById(inputId);
-    if(!el) return;
-    const row = el.closest('.tire-row');
-    const cap = el.parentElement?.querySelector('.cap');
-    if(!cap) return;
-    // shorten for DOT fields
-    if(/^(dot_)/.test(inputId)) baseLabel = '製造';
-    // clear old prev span
-    const old = cap.querySelector('.prev-inline'); if(old) old.remove();
-    // reset base text (avoid重複)
-    cap.textContent = baseLabel;
-    const span = document.createElement('span');
-    span.className = 'prev-inline';
-    span.textContent = ` (前回 ${prevVal})`;
-    cap.appendChild(span);
-    if(row) row.classList.add('has-prev');
+  window.PREV_API_URL = window.PREV_API_URL || "https://script.google.com/macros/s/AKfycbyo2U1_TBxvzhJL50GHY8S0NeT1k0kueWb4tI1q2Oaw87NuGXqwjO7PWyCDdqFNZTdz/exec";
+  function val(sel){ const el=document.querySelector(sel); return el? el.value.trim():''; }
+  function capOf(id){ const el=document.getElementById(id); return el?.parentElement?.querySelector('.cap')||null; }
+  function rightLabOfId(id){ const el=document.getElementById(id); return el?.closest('.tire-row')?.querySelector('.lab')||null; }
+  function setPrev(id, base, v){
+    if(v==null || v==='') return;
+    const cap = capOf(id); if(!cap) return;
+    const label = /^dot_/.test(id) ? '製造' : base;
+    cap.textContent = label;
+    const span=document.createElement('span'); span.style.color='#ff8c00'; span.textContent=' (前回 '+v+')'; cap.appendChild(span);
+    if(/^dot_/.test(id)){ const lab=rightLabOfId(id); if(lab) lab.style.fontSize='90%'; }
   }
-
-  // public: apply previous values object
-  // prev = { tread_rf, pre_rf, dot_rf, ... 同名キー }
   window.applyPrevInlineLabels = function(prev){
     if(!prev) return;
-    setCapPrevByInputId('tread_rf','残溝', prev.tread_rf);
-    setCapPrevByInputId('pre_rf','空気圧', prev.pre_rf);
-    setCapPrevByInputId('dot_rf','製造年週', prev.dot_rf);
-
-    setCapPrevByInputId('tread_lf','残溝', prev.tread_lf);
-    setCapPrevByInputId('pre_lf','空気圧', prev.pre_lf);
-    setCapPrevByInputId('dot_lf','製造年週', prev.dot_lf);
-
-    setCapPrevByInputId('tread_lr','残溝', prev.tread_lr);
-    setCapPrevByInputId('pre_lr','空気圧', prev.pre_lr);
-    setCapPrevByInputId('dot_lr','製造年週', prev.dot_lr);
-
-    setCapPrevByInputId('tread_rr','残溝', prev.tread_rr);
-    setCapPrevByInputId('pre_rr','空気圧', prev.pre_rr);
-    setCapPrevByInputId('dot_rr','製造年週', prev.dot_rr);
+    setPrev('tread_rf','残溝', prev.tread_rf); setPrev('pre_rf','空気圧', prev.pre_rf); setPrev('dot_rf','製造年週', prev.dot_rf);
+    setPrev('tread_lf','残溝', prev.tread_lf); setPrev('pre_lf','空気圧', prev.pre_lf); setPrev('dot_lf','製造年週', prev.dot_lf);
+    setPrev('tread_lr','残溝', prev.tread_lr); setPrev('pre_lr','空気圧', prev.pre_lr); setPrev('dot_lr','製造年週', prev.dot_lr);
+    setPrev('tread_rr','残溝', prev.tread_rr); setPrev('pre_rr','空気圧', prev.pre_rr); setPrev('dot_rr','製造年週', prev.dot_rr);
   };
-
-  // hook: when station + plate filled, try fetching from PREV_API_URL if provided
-  function val(sel){ const el=document.querySelector(sel); return el ? el.value.trim() : ''; }
-  function tryFetchPrev(){
-    const station = document.querySelector('[name="station"]')?.value?.trim() || document.getElementById('station')?.value?.trim() || '';
-    const plate   = document.querySelector('[name="plate_full"]')?.value?.trim() || document.getElementById('plate_full')?.value?.trim() || '';
-    if(!station || !plate) return;
-    if(!window.PREV_API_URL){ return; } // UI-only phase: no request if URL未設定
-    const url = `${window.PREV_API_URL}?station=${encodeURIComponent(station)}&plate_full=${encodeURIComponent(plate)}`;
-    fetch(url).then(r=>r.json()).then(j=>{
-      if(j && j.status === 'ok' && j.data){ window.applyPrevInlineLabels(j.data); }
-    }).catch(()=>{});
+  function tryFetch(){
+    const s = val('[name="station"],#station'); const p = val('[name="plate_full"],#plate_full');
+    if(!s || !p || !window.PREV_API_URL) return;
+    const url = window.PREV_API_URL+'?station='+encodeURIComponent(s)+'&plate_full='+encodeURIComponent(p);
+    fetch(url).then(r=>r.json()).then(j=>{ if(j && j.status==='ok' && j.data) applyPrevInlineLabels(j.data); }).catch(()=>{});
   }
-
-  // trigger when station/plate changed
-  const st = document.querySelector('[name="station"],#station'); if(st) st.addEventListener('change', tryFetchPrev);
-  const pl = document.querySelector('[name="plate_full"],#plate_full'); if(pl) pl.addEventListener('change', tryFetchPrev);
-
-  // also attempt on load (URLパラメータによる自動入力対策)
-  document.addEventListener('DOMContentLoaded', tryFetchPrev);
+  document.addEventListener('DOMContentLoaded', tryFetch);
+  const st=document.querySelector('[name="station"],#station'); st&&st.addEventListener('change', tryFetch);
+  const pl=document.querySelector('[name="plate_full"],#plate_full'); pl&&pl.addEventListener('change', tryFetch);
 })();
 // --- end prev labels module ---
 

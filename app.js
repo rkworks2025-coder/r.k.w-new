@@ -119,7 +119,7 @@ if (form) form.addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const p = buildPayload();
   const lines = [
-    `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}${(p.std_f&&p.std_r)?`    ${p.std_f}-${p.std_r}`:''}   RF`,
+    `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}   RF`,
     `${p.tread_lf} ${p.pre_lf} ${p.dot_lf}   LF`,
     `${p.tread_lr} ${p.pre_lr} ${p.dot_lr}   LR`,
     `${p.tread_rr} ${p.pre_rr} ${p.dot_rr}   RR`,
@@ -129,7 +129,7 @@ if (form) form.addEventListener('submit', async (ev)=>{
 
   // 結果画面更新（stationも先頭に）
   resHeader.textContent = (p.station? (p.station+'\n') : '') + p.plate_full + '\n' + p.model;
-  resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
+  resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}` + ((p.std_f && p.std_r) ? `<br>${p.std_f}-${p.std_r}` : '');
   resLines.textContent = lines;
 
   form.style.display = 'none';

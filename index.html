@@ -4,9 +4,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
-<title>タイヤ点検アプリ（本番・黒×オレンジ） v5a</title>
-<link href="style.css?v=v5a" rel="stylesheet"/></head>
-<body><div class="ver-badge">v5a</div>
+<title>タイヤ点検アプリ（本番・黒×オレンジ） v5b</title>
+<link href="style.css?v=v5b" rel="stylesheet"/></head>
+<body><div class="ver-badge">v5b</div>
 <header>
 <h1>タイヤ点検</h1>
 <span id="now">--/-- --:--</span>
@@ -39,13 +39,13 @@
 </div>
 <p class="title section">タイヤ別入力</p>
 <div class="tire-list">
-<div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_rf" inputmode="numeric" type="text"/></div>
-<div class="inline"><div class="cap">空気圧</div><input id="pre_rf" inputmode="numeric" type="text"/></div>
-<div class="inline"><div class="cap">製造年週</div><input id="dot_rf" inputmode="numeric" maxlength="4" type="text"/></div>
+<div class="tire-row"><div class="inline"><div class="cap">残溝<span class="prev-hint" id="prev-depth-hint" style="color:#FF8C00;"></span></div><input id="tread_rf" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">空気圧<span class="prev-hint" id="prev-press-hint" style="color:#FF8C00;"></span></div><input id="pre_rf" inputmode="numeric" type="text"/></div>
+<div class="inline"><div class="cap">製造<span class="prev-hint" id="prev-code-hint" style="color:#FF8C00;"></span>年週</div><input id="dot_rf" inputmode="numeric" maxlength="4" type="text"/></div>
 <div class="lab">RF</div></div>
 <div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_lf" inputmode="numeric" type="text"/></div>
 <div class="inline"><div class="cap">空気圧</div><input id="pre_lf" inputmode="numeric" type="text"/></div>
-<div class="inline"><div class="cap">製造年週</div><input id="dot_lf" inputmode="numeric" maxlength="4" type="text"/></div>
+<div class="inline"><div class="cap">製造<span class="prev-hint" id="prev-code-hint" style="color:#FF8C00;"></span></div><input id="dot_lf" inputmode="numeric" maxlength="4" type="text"/></div>
 <div class="lab">LF</div></div>
 <div class="tire-row"><div class="inline"><div class="cap">残溝</div><input id="tread_lr" inputmode="numeric" type="text"/></div>
 <div class="inline"><div class="cap">空気圧</div><input id="pre_lr" inputmode="numeric" type="text"/></div>
@@ -69,5 +69,5 @@
 </div>
 </div>
 <div class="toast" id="toast">送信しました</div>
-<script defer="True" src="app.js?v=v5a"></script></body>
+<script defer="True" src="app.js?v=v5b"></script></body>
 </html>

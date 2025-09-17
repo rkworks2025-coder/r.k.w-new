@@ -119,7 +119,7 @@ if (form) form.addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const p = buildPayload();
   const lines = [
-    `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}   RF`,
+    `${p.tread_rf} ${p.pre_rf} ${p.dot_rf}${(p.std_f&&p.std_r)?`    ${p.std_f}-${p.std_r}`:''}   RF`,
     `${p.tread_lf} ${p.pre_lf} ${p.dot_lf}   LF`,
     `${p.tread_lr} ${p.pre_lr} ${p.dot_lr}   LR`,
     `${p.tread_rr} ${p.pre_rr} ${p.dot_rr}   RR`,
@@ -129,7 +129,7 @@ if (form) form.addEventListener('submit', async (ev)=>{
 
   // 結果画面更新（stationも先頭に）
   resHeader.textContent = (p.station? (p.station+'\n') : '') + p.plate_full + '\n' + p.model;
-  resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}` + ((p.std_f && p.std_r) ? `<br>${p.std_f}-${p.std_r}` : '');
+  resTimes.innerHTML = `解錠　${p.unlock||'--:--'}<br>施錠　${p.lock||'--:--'}`;
   resLines.textContent = lines;
 
   form.style.display = 'none';
@@ -415,3 +415,83 @@ document.getElementById('backBtn')?.addEventListener('click',()=>{
 
 })(); 
 // === end reload-restore module ===
+
+
+// === prev-values (last record) block ===
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function val(id){ var el = document.getElementById(id); return el ? (el.value||'') : ''; }
+  function text(el){ return el ? (el.textContent||'') : ''; }
+
+  function getStation(){ 
+    var el = document.querySelector('#station, [name="station"], #Station, [name="Station"]');
+    return el ? (el.value||'') : '';
+  }
+  function getPlate(){
+    // try full plate field first
+    var el = document.querySelector('#plate_full, [name="plate_full"], #plate, [name="plate"], [name="p"]');
+    return el ? (el.value||'') : '';
+  }
+
+  function fillHint(id, txt){
+    var el = $(id);
+    if (!el) return;
+    el.textContent = txt ? '（前回 ' + txt + '）' : '';
+  }
+
+  // Fetch once when both station & plate exist
+  function maybeFetch(){
+    var s = getStation().trim();
+    var p = getPlate().trim();
+    if (!s || !p) return;
+    // avoid double-fetch
+    if (window.__prevFetchDone) return;
+    window.__prevFetchDone = true;
+
+    try{
+      // GAS endpoint (same as submit base), with action=last
+      var urlBase = window.SUBMIT_ENDPOINT || ''; // if app.js defines it
+      if (!urlBase){
+        // try to find from script tag data-endpoint or fallback to known pattern placeholder
+        var meta = document.querySelector('meta[name="gas-endpoint"]');
+        urlBase = meta ? meta.content : '';
+      }
+      // If not found, bail out silently.
+      if (!urlBase) return;
+
+      var url = urlBase + '?action=last&station=' + encodeURIComponent(s) + '&plate=' + encodeURIComponent(p);
+      fetch(url, {method:'GET', mode:'cors', cache:'no-store'})
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(function(data){
+          // Expect keys like RF_depth, RF_press, RF_code, and aggregated hints (or we synthesize from RF)
+          // For compact hint: show RF values as representative; if not, try any front axle average fields
+          var rfDepth = data.RF_depth || data.rf_depth || '';
+          var rfPress = data.RF_press || data.rf_press || data.RF_pressure || '';
+          var rfCode  = data.RF_code  || data.rf_code  || '';
+          // Fallback: if there are aggregated fields
+          var d = data.prev_depth || data.last_depth || '';
+          var pr= data.prev_press || data.last_press || '';
+          var cd= data.prev_code  || data.last_code  || '';
+
+          fillHint('prev-depth-hint', rfDepth || d);
+          fillHint('prev-press-hint', rfPress || pr);
+          fillHint('prev-code-hint',  rfCode  || cd);
+        })
+        .catch(function(e){
+          // silent fail
+        });
+    }catch(e){}
+  }
+
+  // Kick when inputs change (first time)
+  document.addEventListener('input', function(e){
+    if (e && e.target && (e.target.name==='station' || e.target.id==='station' || e.target.name==='plate' || e.target.name==='plate_full' || e.target.id==='plate' || e.target.id==='plate_full')){
+      maybeFetch();
+    }
+  });
+  // also kick on DOM ready
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(maybeFetch, 100); }, {once:true});
+
+})();
+// === end prev-values block ===
+
